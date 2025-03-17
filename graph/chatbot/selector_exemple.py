@@ -2,7 +2,6 @@ from langchain import LLMChain
 from langchain.prompts import FewShotPromptTemplate, PromptTemplate
 from langchain import LLMChain 
 from langchain.prompts import FewShotPromptTemplate, PromptTemplate
-from .exemples import exemples
 
 schema_description = """
 use just the nodes and properties and relations that existe in this Database Schema:
@@ -73,29 +72,3 @@ example_prompt = PromptTemplate(
 )
 
 
-from langchain import LLMChain
-from langchain.prompts import FewShotPromptTemplate, PromptTemplate
-from langchain_community.vectorstores import Neo4jVector
-from langchain_core.example_selectors import SemanticSimilarityExampleSelector
-from langchain_community.embeddings import HuggingFaceEmbeddings
-
-# Neo4j connection details
-neo4j_url = "bolt://localhost:7687"
-neo4j_user = "neo4j"
-neo4j_password = "12345678"
-
-arabic_embedder = HuggingFaceEmbeddings(
-    model_name="aubmindlab/bert-base-arabertv02",
-    model_kwargs={'device': 'cpu'}
-)
-
-example_selector = SemanticSimilarityExampleSelector.from_examples(
-    exemples,
-    arabic_embedder,
-    Neo4jVector,
-    url=neo4j_url,
-    username=neo4j_user,
-    password=neo4j_password,
-    k=3,
-    input_keys=["question"],
-)

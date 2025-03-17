@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'account.apps.AccountConfig',
+    'graph.apps.GraphConfig',
     'rest_framework',
     'rest_framework_simplejwt',
     'django_filters',

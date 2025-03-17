@@ -1,9 +1,9 @@
 from langchain import LLMChain 
 from langchain.prompts import FewShotPromptTemplate, PromptTemplate
 from .selector_exemple import *
-
+from .exemples import exemples
 few_shot_prompt = FewShotPromptTemplate(
-    example_selector=example_selector,
+    examples=exemples,
     example_prompt=example_prompt,
     prefix="You are an expert in neo4j that converts questions into Cypher queries for a Neo4j database. "
            "The questions are in Arabic, while the database schema is in English.\n{schema_description}\n"
