@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-85_n-=ffdsxendpbcav29_6ut)titw5$p-)^6j@hieumrbf0v1
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.8.50','127.0.0.1']
 
 
 # Application definition
@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'django_filters',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
@@ -54,10 +55,12 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'indexation.urls'
-
+CROS_ALLOW_CREDETIALS=True
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -75,7 +78,10 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'indexation.wsgi.application'
-
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # React dev server
+    "http://192.168.88.50:3000"
+]
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
