@@ -1,0 +1,37 @@
+ # Step 3: Find Personne proprietors for Phone nodes and add them to the results
+            phone_nodes = [node for node in filtered_formatted_nodes if node["node_type"] == "Phone"]
+            for phone_node in phone_nodes:
+                phone_id = phone_node["properties"]["identity"]
+                # Query to find Personne proprietors for the Phone node
+                personne_query = """
+                MATCH (phone:Phone)-[r:Proprietaire]-(personne:Personne)
+                WHERE phone.identity = $phone_id
+                WITH personne,COLLECT({
+                    identity: r.identity, 
+                    type: type(r), 
+                    properties: properties(r), 
+                    startId: startNode(r).identity, 
+                    endId: endNode(r).identity
+                }) AS relations
+                RETURN relations,personne
+
+                """
+                personne_params = {"phone_id": phone_id}
+                personne_results = run_query(personne_query, personne_params)
+                for record in personne_results:
+                    personne = record["personne"]                    
+                    relations = record["relations"]
+                    # Add Personne node
+                    filtered_formatted_nodes.append({
+                        "node_type": "Personne",
+                        "properties": personne
+                    })
+                    # Add Proprietaire relationship with the correct identity
+                    for rel in relations:  # Iterate over each relationship in the list
+                        final_filtered_relations.append({
+                            "identity": rel["identity"],  # Use the identity of the relationship
+                            "type": rel["type"],
+                            "properties": rel["properties"],
+                            "startId": rel["startId"],
+                            "endId": rel["endId"]
+                        })

@@ -1,0 +1,13 @@
+[{"from": 4663, "to": 9944, "label": "Impliquer"},
+ {"from": 128018, "to": 9944, "label": "Proprietaire"}, 
+ {"from": 129730, "to": 128018, "label": "Appel_telephone"},
+  {"from": 4663, "to": 9946, "label": "Impliquer"},
+   {"from": 128017, "to": 9946, "label": "Proprietaire"},
+    {"from": 129739, "to": 128017, "label": "Appel_telephone"}, 
+    {"from": 4663, "to": 9948, "label": "Impliquer"}, 
+    {"from": 136122, "to": 9948, "label": "Proprietaire"},
+     {"from": 129746, "to": 136122, "label": "Appel_telephone"},
+      {"from": 4663, "to": 9950, "label": "Impliquer"},
+       {"from": 136121, "to": 9950, "label": "Proprietaire"},
+        {"from": 129730, "to": 136121, "label": "Appel_telephone"}
+        ]
