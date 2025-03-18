@@ -80,6 +80,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'indexation.wsgi.application'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React dev server
+    "http://localhost:3001",
     "http://192.168.88.50:3000"
 ]
 

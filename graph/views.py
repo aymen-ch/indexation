@@ -85,30 +85,72 @@ def search_nodes(request):
     try:
         # Get data from request body
         node_type = request.data.get('node_type')
-        properties = request.data.get('properties', {})
-        if not node_type or not isinstance(properties, dict):
+        search_payload = request.data.get('properties', {})
+        
+        if not node_type or not isinstance(search_payload, dict):
             return Response(
                 {"error": "Missing or invalid 'node_type' or 'properties'. 'properties' must be a dictionary."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # Construct the Cypher query dynamically based on provided properties
+
+        # Expecting search_payload to contain 'values' and 'operations'
+        values = search_payload.get('values', {})
+        operations = search_payload.get('operations', {})
+        print(operations)
+        if not isinstance(values, dict) or not isinstance(operations, dict):
+            return Response(
+                {"error": "'properties' must contain 'values' and 'operations' dictionaries."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Construct the Cypher query dynamically based on provided properties and operations
         match_conditions = []
         parameters = {}
-        for key, value in properties.items():
-            match_conditions.append(f"n.{key} = ${key}")
-            parameters[key] = value
+        
+        for key, value in values.items():
+            if value is None or value == '':
+                continue  # Skip empty or null values
 
-        query = f"""
-        MATCH (n:{node_type})
-        WHERE {' AND '.join(match_conditions)}
-        RETURN n 
-        """
+            operation = operations.get(key, '=')  # Default to '=' if no operation specified
+            
+            # Handle different operations
+            if operation == '=':
+                match_conditions.append(f"n.{key} = ${key}")
+                parameters[key] = value
+            elif operation == '!=':
+                match_conditions.append(f"n.{key} <> ${key}")
+                parameters[key] = value
+            elif operation in ['>', '<', '>=', '<=']:
+                match_conditions.append(f"n.{key} {operation} ${key}")
+                parameters[key] = value
+            elif operation == 'contains':
+                match_conditions.append(f"n.{key} CONTAINS ${key}")
+                parameters[key] = str(value)  # Ensure value is a string for CONTAINS
+            elif operation == 'startswith':
+                match_conditions.append(f"n.{key} STARTS WITH ${key}")
+                parameters[key] = str(value)  # Ensure value is a string
+            elif operation == 'endswith':
+                match_conditions.append(f"n.{key} ENDS WITH ${key}")
+                parameters[key] = str(value)  # Ensure value is a string
+            else:
+                return Response(
+                    {"error": f"Unsupported operation '{operation}' for property '{key}'"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        # Debugging logs (optional)
+        if not match_conditions:
+            query = f"MATCH (n:{node_type}) RETURN n"
+        else:
+            query = f"""
+            MATCH (n:{node_type})
+            WHERE {' AND '.join(match_conditions)}
+            RETURN n
+            """
+
+        # Debugging logs
         print("Generated Cypher Query:", query)
         print("Parameters:", parameters)
 
-    
         with driver.session() as session:
             result = session.run(query, parameters)
             nodes = [record['n'] for record in result]  # Extract nodes from the result
