@@ -9,10 +9,10 @@ from graph.utility import run_query
 def aggregate(request):
     id_nodes = request.data.get("node_ids", [1160, 126224, 129664, 129668, 136220, 1368, 1370, 34151, 34155])  # List of node IDs
     aggregation_type = request.data.get("aggregation_type", [["Personne", "Impliquer", "Affaire", "Impliquer", "Personne"]])
-    
+
     if not id_nodes:
         return Response({"error": "id_nodes parameter is required"}, status=400)
-    
+
     query_parts = []
     params = {"id_nodes": id_nodes}
     alias_counter = {}  # Dictionary to track alias counts
@@ -48,13 +48,12 @@ def aggregate(request):
 
         # Construct the WHERE clause to filter by node IDs
         intermediate_aliases = aliases[1:-1]  # Exclude the first and last aliases
-        # intermediate_aliases = aliases
         if intermediate_aliases:  # Only add WHERE clause if there are intermediate nodes
             where_clause = "WHERE " + " AND ".join([f"{alias}.identity IN $id_nodes" for alias in intermediate_aliases])
         else:
             where_clause = ""  # No intermediate nodes, so no WHERE clause
 
-        # Construct the WITH and RETURN clauses with combined properties
+        # Construct the WITH and RETURN clauses with separated properties
         start_alias = aliases[0]  # First node
         end_alias = aliases[-1]   # Last node
         first_intermediate = aliases[1] if len(aliases) > 2 else start_alias  # First intermediate node
@@ -69,9 +68,11 @@ def aggregate(request):
             count({aliases[1]}) as count
         WITH 
             start_node, 
-            apoc.map.merge(properties(start_node), properties(first_intermediate_node)) AS start_properties, 
+            properties(start_node) AS start_node_properties,  /* Keep start node properties separate */
+            properties(first_intermediate_node) AS first_intermediate_properties,  /* Separate intermediate properties */
             end_node, 
-            apoc.map.merge(properties(end_node), properties(last_intermediate_node)) AS end_properties, 
+            properties(end_node) AS end_node_properties,  /* Keep end node properties separate */
+            properties(last_intermediate_node) AS last_intermediate_properties,  /* Separate intermediate properties */
             count
         WITH 
             CASE 
@@ -79,8 +80,18 @@ def aggregate(request):
                 THEN {{startId: start_node.identity, endId: end_node.identity, type: "{sublist[3]}", count: count}}
                 ELSE {{startId: end_node.identity, endId: start_node.identity, type: "{sublist[3]}", count: count}}
             END AS relationship,
-            COLLECT(DISTINCT {{identity: start_node.identity, type: labels(start_node)[0], properties: start_properties}}) +
-            COLLECT(DISTINCT {{identity: end_node.identity, type: labels(end_node)[0], properties: end_properties}}) AS nodes
+            COLLECT(DISTINCT {{
+                identity: start_node.identity,
+                type: labels(start_node)[0], 
+                properties: start_node_properties,  /* Node's own properties */
+                aggregated_properties: first_intermediate_properties  /* Aggregated properties from intermediate node */
+            }}) +
+            COLLECT(DISTINCT {{
+                identity: end_node.identity, 
+                type: labels(end_node)[0], 
+                properties: end_node_properties,  /* Node's own properties */
+                aggregated_properties: last_intermediate_properties  /* Aggregated properties from intermediate node */
+            }}) AS nodes
         RETURN nodes, COLLECT(DISTINCT relationship) AS relationships
         """
 
@@ -106,7 +117,8 @@ def aggregate(request):
         COLLECT(DISTINCT {
             identity: node.identity,
             type: node.type,
-            properties: node.properties
+            properties: node.properties,  /* Individual node properties */
+            aggregated_properties: node.aggregated_properties  /* Aggregated properties from related nodes */
         }) AS nodes,
         combined_relationships AS relationships
     """
