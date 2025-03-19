@@ -33,7 +33,7 @@ urlpatterns = [
     path('chatbot/', vchat.chatbot, name='chat'),
     path('run/', vchat.execute_query, name='execute_query'),
     ############################## path ####################################
-    path('get_all_connections/', path_view.get_all_connections, name='get_all_connections'),
+    path('get_all_connections/', path_view.get_all_connections4, name='get_all_connections'),
     path('get_all_connections_subgraphe/', path_view.get_all_connections2, name='get_all_connections2'),
 ]
 
