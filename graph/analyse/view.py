@@ -59,7 +59,7 @@ def Node_clasification(request):
     """
 
     # Dynamically add levels based on depth
-    for level in range(1, depth + 1):
+    for level in range(1, depth):
         part2_query += f"""
         OPTIONAL MATCH (p)-[:contactWithRelation*{level}]-(p{level}:Personne)-[r{level}:Impliquer]-(:Affaire)
         WITH p, {', '.join(f'num_affaires_LvL{i}' for i in range(level))}, COUNT(r{level}) AS num_affaires_LvL{level}
@@ -67,7 +67,7 @@ def Node_clasification(request):
 
     # Finalize Part 2 query
     part2_query += f"""
-    SET p._Lvl_of_Implications = [{', '.join(f'num_affaires_LvL{i}' for i in range(depth + 1))}];
+    SET p._Lvl_of_Implications = [{', '.join(f'num_affaires_LvL{i}' for i in range(depth ))}];
     """
 
     # Define the rest of the queries (Parts 3-7)
@@ -95,7 +95,7 @@ def Node_clasification(request):
         MATCH (p1:Personne)-[:contactWithRelation]-(p2:Personne)
         WHERE "operationeel" IN p1._class AND p2._Lvl_of_Implications[1] > p1._Lvl_of_Implications[0]
         SET p2._class = CASE WHEN NOT "soutien" IN p2._class THEN p2._class + "soutien" ELSE p2._class END,
-            p2._affiresoutin = p2._affiresoutin + p1._affireOpretioneele;
+            p2._affiresoutin = apoc.coll.toSet(p2._affiresoutin + p1._affireOpretioneele);
         """,
         f"""
         WITH range(1, {depth - 1}) AS levels
@@ -103,22 +103,22 @@ def Node_clasification(request):
         MATCH (p1:Personne)-[:contactWithRelation]-(p2:Personne)
         WHERE "soutien" IN p1._class AND p2._Lvl_of_Implications[i+1] > p1._Lvl_of_Implications[i]
         SET p2._class = CASE WHEN NOT "soutien" IN p2._class THEN p2._class + "soutien" ELSE p2._class END,
-            p2._affiresoutin = p2._affiresoutin + p1._affiresoutin;
+            p2._affiresoutin = apoc.coll.toSet(p2._affiresoutin + p1._affiresoutin);
         """,
-        f"""
-        // Part 6: Assign "leader" to Personne nodes that qualify
-        WITH range(1, 1) AS leader_levels
-        UNWIND leader_levels AS i
-        MATCH (p1:Personne)
-        WHERE "soutien" IN p1._class
-        WITH p1, i,
-             ALL(p2 IN [(p1)-[:contactWithRelation]-(p2:Personne) | p2] 
-                 WHERE p2._Lvl_of_Implications[i] < p1._Lvl_of_Implications[i+1]) AS level_leader
-        WITH p1, COLLECT(level_leader) AS leader_flags
-        WHERE ANY(flag IN leader_flags WHERE flag = true)
-        SET p1._class = CASE WHEN NOT "leader" IN p1._class THEN p1._class + "leader" ELSE p1._class END,
-            p1._affireleader = p1._affiresoutin;
-        """,
+        # f"""
+        # // Part 6: Assign "leader" to Personne nodes that qualify
+        # WITH range({depth - 2}, {depth - 2}) AS leader_levels
+        # UNWIND leader_levels AS i
+        # MATCH (p1:Personne)
+        # WHERE "soutien" IN p1._class
+        # WITH p1, i,
+        #      ALL(p2 IN [(p1)-[:contactWithRelation]-(p2:Personne) | p2] 
+        #          WHERE p2._Lvl_of_Implications[i] < p1._Lvl_of_Implications[i+1]) AS level_leader
+        # WITH p1, COLLECT(level_leader) AS leader_flags
+        # WHERE ANY(flag IN leader_flags WHERE flag = true)
+        # SET p1._class = CASE WHEN NOT "leader" IN p1._class THEN p1._class + "leader" ELSE p1._class END,
+        #     p1._affireleader = p1._affiresoutin;
+        # """,
         """
         // Part 7: Delete all contactWithRelation relationships
         MATCH (p1:Personne)-[r:contactWithRelation]-(p2:Personne)

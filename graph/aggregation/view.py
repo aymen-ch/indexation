@@ -439,93 +439,50 @@ def aggregate_with_algo(request):
     id_affaires = request.data.get('id_affaires', [1171])  # Default value if not provided
     depth = int(request.data.get('depth', 3))  # Default depth if not provided
 
-    # Initialize the query variable
-    query = ""
+    # Validate depth
+    if depth < 1:
+        return JsonResponse({"error": "Depth must be at least 1."}, status=400)
 
-    if depth == 1:
-        query = """
-        // For depth = 1, return Affaire and directly involved Personne nodes
-        UNWIND $id_affaires AS id_affaire
-        MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
-        WHERE c.identity = id_affaire
-        WITH c, p1
-        // Collect all nodes and relations
-        WITH 
-            COLLECT(DISTINCT {identity: c.identity, type: "Affaire"}) + 
-            COLLECT(DISTINCT {identity: p1.identity, type: "Personne"}) AS nodes,
-            COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: "Impliquer"}) AS relations
-        // Return the aggregated result
-        RETURN {
-            nodes: nodes,
-            relations: relations
-        } AS Result;
+    # Initialize the query variable
+    query = """
+    UNWIND $id_affaires AS id_affaire
+    MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
+    WHERE c.identity = id_affaire
+    """
+
+    # Dynamically build the query for the given depth
+    nodes = ["COLLECT(DISTINCT {identity: c.identity, type: 'Affaire'})", 
+             "COLLECT(DISTINCT {identity: p1.identity, type: 'Personne'})"]
+    relations = ["COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: 'Impliquer'})"]
+
+    for i in range(1, depth):
+        query += f"""
+        MATCH (p{i})-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-(p{i+1}:Personne)
+        WHERE id_affaire IN p{i+1}._affiresoutin AND p{i+1}._Lvl_of_Implications[{i}] > p{i}._Lvl_of_Implications[{i-1}]
         """
-    elif depth == 2:
-        query = """
-        // For depth = 2, return the entire chain
-        UNWIND $id_affaires AS id_affaire
-        MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
-        WHERE c.identity = id_affaire
-        MATCH (p1)-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-(p2:Personne)
-        WHERE id_affaire IN p2._affiresoutin
-        WITH c, p1, p2
-        // Collect all nodes and relations
-        WITH 
-            COLLECT(DISTINCT {identity: c.identity, type: "Affaire"}) + 
-            COLLECT(DISTINCT {identity: p1.identity, type: "Personne"}) + 
-            COLLECT(DISTINCT {identity: p2.identity, type: "Personne"}) AS nodes,
-            COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: "Impliquer"}) + 
-            COLLECT(DISTINCT {source: p1.identity, target: p2.identity, relation: "Contact with phone"}) AS relations
-        // Return the aggregated result
-        RETURN {
-            nodes: nodes,
-            relations: relations
-        } AS Result;
-        """
-    elif depth == 3:
-        query = """
-        // For depth = 3, return the entire chain
-        UNWIND $id_affaires AS id_affaire
-        MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
-        WHERE c.identity = id_affaire
-        MATCH (p1)-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-(p2:Personne)
-        WHERE id_affaire IN p2._affiresoutin
-        MATCH (p2)-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-(p3:Personne)
-        WHERE id_affaire IN p3._affireleader
-        WITH c, p1, p2, p3
-        // Collect all nodes and deduplicate
-        WITH 
-            COLLECT(DISTINCT {identity: c.identity, type: "Affaire"}) + 
-            COLLECT(DISTINCT {identity: p1.identity, type: "Personne"}) + 
-            COLLECT(DISTINCT {identity: p2.identity, type: "Personne"}) + 
-            COLLECT(DISTINCT {identity: p3.identity, type: "Personne"}) AS nodes,
-            // Collect all edges with a standardized direction
-            COLLECT(DISTINCT CASE 
-                WHEN p1.identity < p2.identity THEN {source: p1.identity, target: p2.identity, relation: "Contact with phone"}
-                ELSE {source: p2.identity, target: p1.identity, relation: "Contact with phone"}
-            END) +
-            COLLECT(DISTINCT CASE 
-                WHEN p2.identity < p3.identity THEN {source: p2.identity, target: p3.identity, relation: "Contact with phone"}
-                ELSE {source: p3.identity, target: p2.identity, relation: "Contact with phone"}
-            END) +
-            COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: "Impliquer"}) AS relations
-        // Return the aggregated result
-        RETURN {
-            nodes: nodes,
-            relations: relations
-        } AS Result;
-        """
-    else:
-        return JsonResponse({"error": "Invalid depth value. Depth must be 1, 2, or 3."}, status=400)
+        nodes.append(f"COLLECT(DISTINCT {{identity: p{i+1}.identity, type: 'Personne'}})")
+        relations.append(f"COLLECT(DISTINCT {{source: p{i}.identity, target: p{i+1}.identity, relation: 'Contact with phone'}})")
+
+    # Finalize the query
+    query += f"""
+    WITH 
+        {' + '.join(nodes)} AS nodes,
+        {' + '.join(relations)} AS relations
+    RETURN {{
+        nodes: nodes,
+        relations: relations
+    }} AS Result;
+    """
 
     # Print the query for debugging
-    print("identity : ", id_affaires)
+    # print("identity : ", id_affaires)
     print(query)
+
     # Execute the query using the run_query function
     params = {"id_affaires": id_affaires, "depth": depth}
     data = run_query(query, params)
 
-    print('result : ', data)
+    # print('result : ', data)
 
     # Return the result as a JSON response
     return JsonResponse(data, safe=False)
