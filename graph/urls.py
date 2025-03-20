@@ -10,6 +10,7 @@ urlpatterns = [
     ############################### Analysis ################################### 
     path('Node_clasification/', analyse_view.Node_clasification, name='Node_clasification'),
     path('fetch_distinct_relations/', analyse_view.fetch_distinct_relations, name='fetch_distinct_relations'),
+    path('Secteur_Activite/', analyse_view.Secteur_Activite, name='Secteur_Activite'),
     ############################### aggregation ###################################  
     path('agregate/', view.aggregate, name='agregate_context'),
     path('aggregatehria/', view.aggregate_hira, name='aggre_hira'),
