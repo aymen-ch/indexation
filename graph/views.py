@@ -50,6 +50,45 @@ def getdata(request):
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['POST'])
+def getrelationData(request):
+    # Extract the identity from the request data
+    identity = request.data.get('identity')
+    print(identity)
+    if not identity:
+        return Response(
+            {"error": "Identity is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        # Define the Cypher query
+        query = """
+        MATCH ()-[n {identity: $identity} ]-()  RETURN n
+        """
+        print("nn")
+
+        # Execute the query using the Neo4j driver
+        with driver.session() as session:
+            results = session.run(query, {"identity": identity})
+            records = list(results)  # Convert the result to a list of records
+
+            if not records:
+                return Response(
+                    {"error": "Node not found."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Extract the first result (node data)
+            node_data = records[0]["n"]
+            return Response(node_data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
 # Execute query using Neo4j driver
 @api_view(['GET'])
 def get_node_types(request):

@@ -487,124 +487,66 @@ def aggregate_with_algo(request):
     # Return the result as a JSON response
     return JsonResponse(data, safe=False)
 
+
+
+
 @api_view(['POST'])
-def withcall(request):
-    # Extract the date and depth from the request body
-    startdate = request.data.get('startdate', '02-01-2023')  # Default date if not provided
-    enddate = request.data.get('enddate', '02-01-2023')  # Default date if not provided
-    depth = int(request.data.get('depth', 2))  # Default depth if not provided
+def personne_criminal_network(request):
+    id_personnes = request.data.get('id_personnes', [1322])
+    print(id_personnes)
 
-    # Base query
     query = """
-    MATCH (a:Affaire)-[:Impliquer]-(p1:Personne)-[:Proprietaire]-(ph1:Phone)
-    WHERE a.date >= $startdate AND a.date <= $enddate
-    WITH a, p1, ph1,
-         collect({
-             identity: p1.identity,
-             type: "Personne",
-             level: 1  // Level 1 for personnes directly connected to Affaire
-         }) AS personnesNodes,
-         collect({
-             source: a.identity,
-             target: p1.identity,
-             type: "Impliquer"
-         }) AS relations
+    MATCH (start:Personne)
+    WHERE start.identity IN $id_personnes
+    WITH start
+    CALL {
+        WITH start
+        MATCH (start)-[r1:Impliquer]-(affaire:Affaire)
+        RETURN [start, affaire] AS pathNodes, [r1] AS pathRels
+        UNION
+        WITH start
+        MATCH (start)-[r1:Proprietaire]-(phone1:Phone)-[r2:Appel_telephone]-(phone2:Phone)-[r3:Proprietaire]-(p2:Personne)
+        WHERE phone1 <> phone2 AND p2 <> start
+        CALL {
+            WITH p2
+            MATCH (p2)-[r4:Impliquer]-(affaire:Affaire)
+            RETURN [p2, affaire] AS subPathNodes, [r4] AS subPathRels
+            UNION
+            WITH p2
+            MATCH (p2)-[r4:Proprietaire]-(phone3:Phone)-[r5:Appel_telephone]-(phone4:Phone)-[r6:Proprietaire]-(p3:Personne)
+            WHERE phone3 <> phone4 AND p3 <> p2
+            CALL {
+                WITH p3
+                MATCH (p3)-[r7:Impliquer]-(affaire:Affaire)
+                RETURN [p3, affaire] AS subPathNodes, [r7] AS subPathRels
+                UNION
+                WITH p3
+                MATCH (p3)-[r7:Proprietaire]-(phone5:Phone)-[r8:Appel_telephone]-(phone6:Phone)-[r9:Proprietaire]-(p4:Personne)
+                WHERE phone5 <> phone6 AND p4 <> p3
+                CALL {
+                    WITH p4
+                    MATCH (p4)-[r10:Impliquer]-(affaire:Affaire)
+                    RETURN [p4, affaire] AS subPathNodes, [r10] AS subPathRels
+                }
+                WITH [p3, phone5, phone6, p4] + subPathNodes AS subPathNodes, 
+                     [r7, r8, r9] + subPathRels AS subPathRels
+                RETURN subPathNodes, subPathRels
+            }
+            WITH [p2, phone3, phone4, p3] + subPathNodes AS subPathNodes, 
+                 [r4, r5, r6] + subPathRels AS subPathRels
+            RETURN subPathNodes, subPathRels
+        }
+        WITH [start, phone1, phone2, p2] + subPathNodes AS pathNodes, 
+             [r1, r2, r3] + subPathRels AS pathRels
+        RETURN pathNodes, pathRels
+    }
+    WITH pathNodes, pathRels,
+         [i IN RANGE(0, SIZE(pathNodes)-2) | 
+             {source: pathNodes[i].identity, target: pathNodes[i+1].identity, type: TYPE(pathRels[i])}] AS relations
+    RETURN {nodes: [n IN pathNodes | {identity: n.identity, type: LABELS(n)[0]}], type: relations} AS path;
     """
 
-    # Level 1: Find p2 connected to p1 via phone calls (optional)
-    if depth >= 1:
-        query += """
-        OPTIONAL MATCH (ph1)-[:Appel_telephone]-(ph2:Phone)-[:Proprietaire]-(p2:Personne)
-        WHERE p2.identity IS NOT NULL
-        WITH a, p1, personnesNodes, relations, ph1, ph2, p2
-        // Calculate callCount between p1 and p2
-        OPTIONAL MATCH (ph1)-[call:Appel_telephone]-(ph2)
-        WITH a, p1, personnesNodes, relations, p2, count(call) AS callCount
-        WITH a, p1, personnesNodes, relations,
-             collect({
-                 identity: p2.identity,
-                 type: "Personne",
-                 level: 2  // Level 2 for personnes connected via phone calls
-             }) AS personnesLevel1Nodes,
-             collect({
-                 source: p1.identity,
-                 target: p2.identity,
-                 type: "Contact",
-                 callCount: callCount  // Include callCount in the relationship
-             }) AS relationsLevel1,
-             collect(p2) AS p2List  // Collect p2 for use in Level 2
-        """
-
-    # Level 2: Find p3 connected to p2 via phone calls (optional)
-    if depth >= 2:
-        query += """
-        OPTIONAL MATCH (p2)-[:Proprietaire]-(ph2:Phone)-[:Appel_telephone]-(ph3:Phone)-[:Proprietaire]-(p3:Personne)
-        WHERE p2 IN p2List AND p3.identity IS NOT NULL  // Ensure p2 is from Level 1 and p3 has a non-null identity
-        WITH a, p1, personnesNodes, relations, personnesLevel1Nodes, relationsLevel1, p2, p3, ph2, ph3
-        // Calculate callCount between p2 and p3
-        OPTIONAL MATCH (ph2)-[call:Appel_telephone]-(ph3)
-        WITH a, p1, personnesNodes, relations, personnesLevel1Nodes, relationsLevel1, p2, p3, count(call) AS callCount
-        WITH a, p1, personnesNodes, relations, personnesLevel1Nodes, relationsLevel1,
-             collect({
-                 identity: p3.identity,
-                 type: "Personne",
-                 level: 3  // Level 3 for personnes connected via phone calls to Level 2
-             }) AS personnesLevel2Nodes,
-             collect({
-                 source: p2.identity,
-                 target: p3.identity,
-                 type: "Contact",
-                 callCount: callCount  // Include callCount in the relationship
-             }) AS relationsLevel2
-        """
-
-    # Combine all nodes and relationships
-    if depth == 0:
-        query += """
-        WITH a,
-             personnesNodes + [{identity: a.identity, type: "Affaire", level: 0}] AS allNodes,  // Level 0 for Affaire
-             relations AS allRelations
-        """
-    elif depth == 1:
-        query += """
-        WITH a,
-             personnesNodes + personnesLevel1Nodes + [{identity: a.identity, type: "Affaire", level: 0}] AS allNodes,  // Level 0 for Affaire
-             relations + relationsLevel1 AS allRelations
-        """
-    elif depth >= 2:
-        query += """
-        WITH a,
-             personnesNodes + personnesLevel1Nodes + personnesLevel2Nodes + [{identity: a.identity, type: "Affaire", level: 0}] AS allNodes,  // Level 0 for Affaire
-             relations + relationsLevel1 + relationsLevel2 AS allRelations
-        """
-
-    # Filter out nodes and relationships with null identities
-    query += """
-    WITH a,
-         [node IN allNodes WHERE node.identity IS NOT NULL] AS filteredNodes,
-         [rel IN allRelations WHERE rel.source IS NOT NULL AND rel.target IS NOT NULL] AS filteredRelations
-    // Collect all nodes and relationships across all Affaire entities
-    WITH 
-         collect(filteredNodes) AS allFilteredNodes,
-         collect(filteredRelations) AS allFilteredRelations
-    // Flatten the lists and remove duplicates
-    WITH 
-         apoc.coll.toSet(apoc.coll.flatten(allFilteredNodes)) AS nodes,
-         apoc.coll.toSet(apoc.coll.flatten(allFilteredRelations)) AS relations
-    // Return a single JSON object containing all nodes and relationships
-    RETURN {
-        nodes: nodes,
-        relations: relations
-    } AS result
-    """
-
-    # Print the query for debugging
     print(query)
-
-    # Execute the query using the run_query function
-    params = {"startdate": startdate, "enddate": enddate}
+    params = {"id_personnes": id_personnes}
     data = run_query(query, params)
-
-
-    # Return the result as a JSON response
     return JsonResponse(data, safe=False)

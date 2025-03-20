@@ -102,6 +102,7 @@ def get_all_connections4(request):
                 seen_node_sequences.add(node_sequence)
                 unique_paths.append(path)
 
+
         return JsonResponse({'paths': unique_paths}, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
