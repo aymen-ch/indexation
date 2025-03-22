@@ -23,6 +23,7 @@ urlpatterns = [
     path('node-types/properties/', views.get_node_properties, name='get_node_properties'),
     path('search-nodes/', views.search_nodes, name='search_nodes'),
     path('get_node_relationships/', views.get_node_relationships, name='get_node_relationships'),
+    path('personne_criminal_network/', views.personne_criminal_network, name='personne_criminal_network'),
     #################################contextualization#################################
     path('daira_and_commune/', context_view.get_daira_and_commune, name='get_daira_and_commune'),
     path('filter_affaire_relations/', context_view.filter_affaire_relations, name='filter_affaire_relations'),

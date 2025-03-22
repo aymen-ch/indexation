@@ -251,8 +251,138 @@ def get_possible_relations(request):
             return Response({"relations": relationship_types}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from neo4j import GraphDatabase
+
+# Assuming you have your Neo4j driver initialized somewhere
+# driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from neo4j import GraphDatabase
+
+# Assuming driver is initialized
+# driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
 
 
+@api_view(['POST'])
+def personne_criminal_network(request):
+    # Get properties from request body
+    properties = request.data.get('properties', {})
+    
+    if not isinstance(properties, dict) or 'identity' not in properties:
+        return Response(
+            {"error": "Missing or invalid 'properties'. Must include 'identity'"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Updated Cypher query using apoc.path.expandConfig
+    query = """
+    MATCH (context:Personne {identity: $identity})
+    CALL apoc.path.expandConfig(context, {
+      relationshipFilter: "Proprietaire|Appel_telephone|Impliquer",
+      minLevel: 1,
+      maxLevel: 5
+    })
+    YIELD path
+    WHERE last(nodes(path)):Affaire
+    WITH collect(nodes(path)) AS all_node_lists, collect(relationships(path)) AS all_rel_lists
+    WITH apoc.coll.flatten(all_node_lists) AS all_nodes, apoc.coll.flatten(all_rel_lists) AS all_rels
+    WITH apoc.coll.toSet(all_nodes) AS unique_nodes, apoc.coll.toSet(all_rels) AS unique_rels
+    RETURN {
+      nodes: [n IN unique_nodes | {id: ID(n), labels: labels(n), properties: properties(n)}],
+      edges: [r IN unique_rels | {id: ID(r), type: type(r), startNode: ID(startNode(r)), endNode: ID(endNode(r)), properties: properties(r)}]
+    } AS result
+    """
+    
+    parameters = {'identity': properties['identity']}
+    
+    try:
+        with driver.session() as session:
+            result = session.run(query, parameters)
+            record = result.single()  # Single row with all unique nodes and edges
+            
+            if record:
+                network_data = record["result"]
+                return Response(network_data, status=status.HTTP_200_OK)
+            else:
+                return Response({"nodes": [], "edges": []}, status=status.HTTP_200_OK)
+                
+    except Exception as e:
+        return Response(
+            {"error": f"Error executing query: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+    
+
+@api_view(['POST'])
+def personne_criminal_network_old(request):
+    # Get properties from request body
+    properties = request.data.get('properties', {})
+    
+    if not isinstance(properties, dict) or 'identity' not in properties:
+        return Response(
+            {"error": "Missing or invalid 'properties'. Must include 'identity'"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Generalized Cypher query to collect unique nodes and edges from all paths
+    query = """
+    MATCH (context:Personne {identity: $identity})
+    MATCH path = (context)-[rels:Proprietaire|Appel_telephone|Impliquer*1..5]-(affaire:Affaire)
+    
+    // Extract all nodes and relationships from all paths
+    WITH nodes(path) AS path_nodes, relationships(path) AS path_rels
+    WITH collect(path_nodes) AS all_nodes_collection, collect(path_rels) AS all_rels_collection
+    
+    // Flatten and deduplicate nodes
+    WITH 
+        [node IN apoc.coll.flatten(all_nodes_collection) | {
+            id: ID(node),
+            labels: labels(node),
+            properties: properties(node)
+        }] AS all_nodes,
+        [rel IN apoc.coll.flatten(all_rels_collection) | {
+            id: ID(rel),
+            type: type(rel),
+            startNode: ID(startNode(rel)),
+            endNode: ID(endNode(rel)),
+            properties: properties(rel)
+        }] AS all_edges
+    
+    // Remove duplicates
+    WITH 
+        apoc.coll.toSet(all_nodes) AS unique_nodes,
+        apoc.coll.toSet(all_edges) AS unique_edges
+    
+    RETURN {nodes: unique_nodes, edges: unique_edges} AS result
+    """
+    
+    parameters = {'identity': properties['identity']}
+    
+    try:
+        with driver.session() as session:
+            result = session.run(query, parameters)
+            record = result.single()  # Single row with all unique nodes and edges
+            
+            if record:
+                network_data = record["result"]
+                return Response(network_data, status=status.HTTP_200_OK)
+            else:
+                return Response({"nodes": [], "edges": []}, status=status.HTTP_200_OK)
+                
+    except Exception as e:
+        return Response(
+            {"error": f"Error executing query: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )   
 @api_view(['POST'])
 def get_node_relationships(request):
     # Get data from the request body
