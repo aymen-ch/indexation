@@ -50,8 +50,72 @@ def getdata(request):
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+@api_view(['POST'])
+def searchonnode(request):
+    # Extract the search value from the request data
+    search_value = request.data.get('query')
+    print(search_value)
+    
+    if not search_value:
+        return Response(
+            {"error": "Search value is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Step 1: Get all full-text index names
+        index_query = """
+        SHOW FULLTEXT INDEXES
+        YIELD name
+        RETURN collect(name) AS index_names
+        """
+        
+        # Step 2: Search query template for each index
+        search_query = """
+        UNWIND $index_names AS index_name
+        CALL db.index.fulltext.queryNodes(index_name, $search_value)
+        YIELD node, score
+        RETURN labels(node)[0] AS type, node.identity AS identity, properties(node) AS properties, score
+        """
+        
+        with driver.session() as session:
+            # Execute the index query first
+            index_result = session.run(index_query)
+            index_record = index_result.single()
+            if not index_record or not index_record["index_names"]:
+                return Response(
+                    {"error": "No full-text indexes found."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            index_names = index_record["index_names"]
+            
+            # Execute the search query with the collected index names
+            results = session.run(search_query, {
+                "search_value": search_value,
+                "index_names": index_names
+            })
+            records = list(results)
 
+           
 
+            # Process all results into a list of dictionaries
+            response_data = [
+                {
+                    "identity": record["identity"],         # Node's internal identity
+                    "properties": record["properties"],     # All node properties
+                    "score": record["score"],               # Relevance score
+                    "type": record["type"]                  # First label as type
+                }
+                for record in records
+            ]
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 @api_view(['POST'])
 def getrelationData(request):
     # Extract the identity from the request data
