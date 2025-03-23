@@ -15,7 +15,6 @@ urlpatterns = [
     path('agregate/', view.aggregate, name='agregate_context'),
     path('aggregatehria/', view.aggregate_hira, name='aggre_hira'),
     path('aggregate_with_algo/', view.aggregate_with_algo, name='aggregate_with_algo'),
-    path('personne_criminal_network/', view.personne_criminal_network, name='personne_criminal_network'),
     ############################### views en general expand , rechreche ###################################
     path('getdata/', views.getdata, name='getdata'),
     path('getrelationData/', views.getrelationData, name='getrelationData'),
