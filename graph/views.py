@@ -229,45 +229,142 @@ def recherche(request):
     
 @api_view(['POST'])
 def getrelationData(request):
-    # Extract the identity from the request data
-    #    
-    # here if the identity is like this 2334-65665 and the path   is ["Personne", "Proprietaire", "Phone", "Appel_telephone", "Phone", "Proprietaire", "Personne"] this is is virtuel relation so get it like this 
-    #  match ( Personne {identity:2334})-[Proprietaire]-(:Phone)-[r:Appel_telephone]-(:Phone)-[proportieter]-(Personne{identity:65665})   so the relation to be geted is r , with the count(r) which the halve of the path ,  
-    #  if the identity is normal let the view as it is 
+    # Extract the identity and path from the request data
     identity = request.data.get('identity')
-    print(identity)
+    path = request.data.get('path')
+    print(f"Identity: {identity}, Path: {path}")
+    
     if not identity:
         return Response(
             {"error": "Identity is required."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
     try:
-        # Define the Cypher query
-        query = """
-          MATCH ()-[n {identity: $identity} ]-()  RETURN n
-        """
-        print("nn")
-
-        # Execute the query using the Neo4j driver
-        with driver.session() as session:
-            results = session.run(query, {"identity": identity})
-            records = list(results)  # Convert the result to a list of records
-
-            if not records:
+        # Check if it's a virtual relation (contains hyphen)
+        if isinstance(identity, str) and '-' in identity:
+            # Validate path exists and has odd length (to have a middle)
+            if not path or not isinstance(path, list) or len(path) % 2 == 0:
                 return Response(
-                    {"error": "Node not found."},
-                    status=status.HTTP_404_NOT_FOUND
+                    {"error": "A valid path array with odd length is required for virtual relations."},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Extract the first result (node data)
-            node_data = records[0]["n"]
-            return Response(node_data, status=status.HTTP_200_OK)
+            # Split the compound identity and convert to integers
+            try:
+                start_id, end_id = map(int, identity.split('-'))
+            except ValueError:
+                return Response(
+                    {"error": "Virtual relation identity must contain valid integers separated by hyphen."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Build the Cypher query dynamically
+            middle_index = len(path) // 2
+            middle_relation = path[middle_index]
+            
+            # Construct the MATCH pattern
+            match_clauses = []
+            for i in range(0, len(path) - 1, 2):
+                node1 = path[i]
+                rel = path[i + 1]
+                node2 = path[i + 2]
+                
+                # Use different variable names for each step
+                n1_var = f"n{i//2}"
+                n2_var = f"n{i//2 + 1}"
+                rel_var = f"r{i//2}"
+                
+                if i == 0:
+                    # First node with start_id
+                    pattern = f"({n1_var}:{node1} {{identity: $start_id}})-[{rel_var}:{rel}]-({n2_var}:{node2})"
+                elif i == len(path) - 3:
+                    # Last node with end_id
+                    pattern = f"({n1_var}:{node1})-[{rel_var}:{rel}]-({n2_var}:{node2} {{identity: $end_id}})"
+                else:
+                    # Middle relations, keep track of the middle one
+                    if i == middle_index - 1:
+                        pattern = f"({n1_var}:{node1})-[r:{rel}]-({n2_var}:{node2})"
+                    else:
+                        pattern = f"({n1_var}:{node1})-[{rel_var}:{rel}]-({n2_var}:{node2})"
+                
+                match_clauses.append(pattern)
+
+            # Construct the complete query with proper Cypher syntax
+            query = (
+                f"MATCH {', '.join(match_clauses)}\n"
+                "WITH collect(r) as relations\n"
+                f"RETURN {{type: '{middle_relation}', count: size(relations), detail: [rel in relations | {{identity: rel.identity, properties: properties(rel)}}]}} as relation_data"
+            )
+            
+            
+            with driver.session() as session:
+                results = session.run(query, {
+                    "start_id": start_id,
+                    "end_id": end_id
+                })
+                records = list(results)
+
+                if not records:
+                    return Response(
+                        {"error": "Virtual relation not found."},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
+                relation_data = records[0]["relation_data"]
+                # Transform the detail list into a dictionary with relation numbering
+                formatted_relation = {
+                    "type": relation_data["type"],
+                    "count": relation_data["count"],
+                    "identity":identity,
+                    "detail": {
+                        f"{middle_relation.lower()}{i+1}": rel 
+                        for i, rel in enumerate(relation_data["detail"])
+                    }
+                }
+                print(relation_data)  # For debugging
+                return Response(formatted_relation, status=status.HTTP_200_OK)
+
+        else:
+            # Handle normal identity case
+            try:
+                identity = int(identity)
+            except ValueError:
+                return Response(
+                    {"error": "Normal relation identity must be an integer."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            query = """
+                MATCH ()-[n {identity: $identity}]-()
+                RETURN {
+                    identity: n.identity,
+                    type: type(n),
+                    properties: properties(n)
+                } as relation_data
+            """
+
+            with driver.session() as session:
+                results = session.run(query, {"identity": identity})
+                records = list(results)
+
+                if not records:
+                    return Response(
+                        {"error": "Node not found."},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
+                relation_data = records[0]["relation_data"]
+                return Response(relation_data, status=status.HTTP_200_OK)
+
     except Exception as e:
         return Response(
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
+
+
 # Execute query using Neo4j driver
 @api_view(['GET'])
 def get_node_types(request):
@@ -298,6 +395,8 @@ def get_node_properties(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+
+
 @api_view(['POST'])
 def search_nodes(request):
     try:

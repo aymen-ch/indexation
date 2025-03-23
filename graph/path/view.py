@@ -50,8 +50,8 @@ def get_all_connections4(request):
         uniqueness: 'NODE_PATH'  // Ensures nodes aren't repeated in a single path
     }) YIELD path
     RETURN 
-        [node IN nodes(path) | {identity: id(node), labels: labels(node), properties: properties(node)}] AS nodes,
-        [r IN relationships(path) | {source: id(startNode(r)), target: id(endNode(r)), type: type(r), properties: properties(r)}] AS relationships
+        [node IN nodes(path) | {identity: node.identity, labels: labels(node), properties: properties(node)}] AS nodes,
+        [r IN relationships(path) | {source: startNode(r).identity, target: endNode(r).identity, type: type(r), properties: properties(r)}] AS relationships
     """
     params = {
         'start_id': node_ids[0],  # First node ID
@@ -81,7 +81,7 @@ def get_all_connections4(request):
                     'source': rel['source'],
                     'target': rel['target'],
                     'type': rel['type'],
-                    'properties': rel['properties']  # Include relationship properties
+                    'identity': rel['properties']['identity']  # Include relationship properties
                 }
                 for rel in record['relationships']
             ]
