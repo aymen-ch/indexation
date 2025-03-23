@@ -116,9 +116,14 @@ def searchonnode(request):
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+    
 @api_view(['POST'])
 def getrelationData(request):
     # Extract the identity from the request data
+    #    
+    # here if the identity is like this 2334-65665 and the path   is ["Personne", "Proprietaire", "Phone", "Appel_telephone", "Phone", "Proprietaire", "Personne"] this is is virtuel relation so get it like this 
+    #  match ( Personne {identity:2334})-[Proprietaire]-(:Phone)-[r:Appel_telephone]-(:Phone)-[proportieter]-(Personne{identity:65665})   so the relation to be geted is r , with the count(r) which the halve of the path ,  
+    #  if the identity is normal let the view as it is 
     identity = request.data.get('identity')
     print(identity)
     if not identity:
@@ -129,7 +134,7 @@ def getrelationData(request):
     try:
         # Define the Cypher query
         query = """
-        MATCH ()-[n {identity: $identity} ]-()  RETURN n
+          MATCH ()-[n {identity: $identity} ]-()  RETURN n
         """
         print("nn")
 
