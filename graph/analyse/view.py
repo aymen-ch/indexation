@@ -174,73 +174,197 @@ def Node_clasification(request):
     return JsonResponse(results, safe=False)
 
 
+
 @api_view(['POST'])
-def calculate_degree_centrality(request):
-    relationships = request.data
-    if not relationships:
-        return Response({"error": "No relationships provided."}, status=400)
-    
-    nodes = set()
-    edges = []
-
-    if not isinstance(relationships, list):
-        return Response({"error": "Invalid input format. Expected a list of relationships."}, status=400)
-    
-    for rel in relationships:
-        if not all(key in rel for key in ['from', 'to', 'label']):
-            return Response({"error": "Invalid relationship format. Each relationship must include 'from', 'to', and 'label'."}, status=400)
-        
-        from_node, to_node, label = rel['from'], rel['to'], rel['label']
-        nodes.add(from_node)
-        nodes.add(to_node)
-        edges.append({"start": from_node, "end": to_node, "type": label})
-    
-    gds_graph_name = "tempSubgraph"
-
+def calculate_betweenness_centrality(request):
+    """
+    Calculate normalized betweenness centrality for Personne nodes.
+    Returns statistics about the calculation process.
+    """
     try:
-        create_nodes_query = """
-        UNWIND $nodes AS node_id
-        MERGE (n:TempNode {id: node_id})
+       
+
+        # Step 1: Create temporary relationships
+        
+        query_part1 = """
+        MATCH (p1:Personne)-[:Impliquer]-(a:Affaire)-[:Impliquer]-(p2:Personne)
+        WHERE p1 <> p2
+        MERGE (p1)-[rel:contactWithAffaire {affaireId: a.identity}]-(p2);
         """
-        create_edges_query = """
-        UNWIND $edges AS edge
-        MATCH (start:TempNode {id: edge.start}), (end:TempNode {id: edge.end})
-        MERGE (start)-[r:TempRel {type: edge.type}]->(end)
+        run_query(query_part1)
+
+      
+        query_part2 = """
+        MATCH (p1:Personne)-[:Proprietaire]-(ph1:Phone)-[ap:Appel_telephone]->(ph2:Phone)-[:Proprietaire]-(p2:Personne)
+        WHERE p1 <> p2
+        MERGE (p1)-[e:contactWithPhone]-(p2);
         """
-        create_gds_graph_query = f"""
+        run_query(query_part2)
+
+        # Step 2: Project the graph for GDS
+       
+        query_part3 = """
         CALL gds.graph.project(
-            '{gds_graph_name}',
-            'TempNode',
-            {{
-                TempRel: {{
-                    orientation: 'Undirected'
-                }}
-            }}
+            'predictionGraph',
+            {
+                Personne: {
+                    properties: []
+                }
+            },
+            {
+                contactWithAffaire: {  
+                    orientation: 'UNDIRECTED'
+                },
+                contactWithPhone: {  
+                    orientation: 'UNDIRECTED'
+                }
+            }
+        );
+        """
+        run_query(query_part3)
+
+        # Step 3: Calculate betweenness centrality
+       
+        query_part4 = """
+        CALL gds.betweenness.write(
+            'predictionGraph',
+            {
+                writeProperty: '_betweennessCentrality'
+            }
         )
+        YIELD nodePropertiesWritten, computeMillis, writeMillis, centralityDistribution;
         """
+        run_query(query_part4)
 
-        run_query(create_nodes_query, {"nodes": list(nodes)})
-        run_query(create_edges_query, {"edges": edges})
-        run_query(create_gds_graph_query, {})
-
-        centrality_query = f"""
-        CALL gds.eigenvector.stream('{gds_graph_name}')
-        YIELD nodeId, score
-        RETURN gds.util.asNode(nodeId).id AS node_id, score
-        ORDER BY score DESC
+        # Step 4: Calculate min-max normalized score
+      
+        query_part5 = """
+        MATCH (p:Personne)
+        WITH min(p._betweennessCentrality) AS minCentrality, 
+             max(p._betweennessCentrality) AS maxCentrality
+        MATCH (p:Personne)
+        SET p._betweennessCentrality = 
+            CASE 
+                WHEN maxCentrality = minCentrality THEN 0
+                ELSE (p._betweennessCentrality - minCentrality) / (maxCentrality - minCentrality)
+            END;
         """
-        centrality_results = run_query(centrality_query)
+        run_query(query_part5)
 
-        cleanup_query = f"CALL gds.graph.drop('{gds_graph_name}') YIELD graphName"
-        delete_temp_nodes = "MATCH (n:TempNode) DETACH DELETE n"
-        run_query(cleanup_query)
-        run_query(delete_temp_nodes)
+        # Step 5: Delete temporary relationships
+       
+        query_part6 = """
+        MATCH (p1:Personne)-[rel:contactWithAffaire]-(p2:Personne)
+        DELETE rel;
+        """
+        run_query(query_part6)
 
-        return Response({"degree_centrality": centrality_results}, status=200)
-    
+        query_part7 = """
+        MATCH (p1:Personne)-[rel:contactWithPhone]-(p2:Personne)
+        DELETE rel;
+        """
+        run_query(query_part7)
+
+        # Step 6: Clean up the projected graph
+      
+        query_part8 = """
+        CALL gds.graph.drop('predictionGraph') YIELD graphName;
+        """
+        run_query(query_part8)
+
+        # Return success response
+        response_data = {
+            "status": "success",
+            "message": "Betweenness centrality calculated and normalized successfully",
+        }
+       
+        return JsonResponse(response_data, status=200)
+
     except Exception as e:
-        cleanup_query = f"CALL gds.graph.drop('{gds_graph_name}') YIELD graphName"
-        delete_temp_nodes = "MATCH (n:TempNode) DETACH DELETE n"
-        run_query(cleanup_query)
-        run_query(delete_temp_nodes)
-        return Response({"error": str(e)}, status=500)
+       
+        return Response({
+            "status": "error",
+            "message": "Failed to calculate betweenness centrality",
+            "error": str(e)
+        }, status=500)
+
+    finally:
+        # Ensure the graph is dropped even if there's an error
+        try:
+         
+            run_query("CALL gds.graph.drop('predictionGraph') YIELD graphName;")
+        except Exception as e:
+            pass
+
+
+
+# @api_view(['POST'])
+# def calculate_degree_centrality(request):
+#     relationships = request.data
+#     if not relationships:
+#         return Response({"error": "No relationships provided."}, status=400)
+    
+#     nodes = set()
+#     edges = []
+
+#     if not isinstance(relationships, list):
+#         return Response({"error": "Invalid input format. Expected a list of relationships."}, status=400)
+    
+#     for rel in relationships:
+#         if not all(key in rel for key in ['from', 'to', 'label']):
+#             return Response({"error": "Invalid relationship format. Each relationship must include 'from', 'to', and 'label'."}, status=400)
+        
+#         from_node, to_node, label = rel['from'], rel['to'], rel['label']
+#         nodes.add(from_node)
+#         nodes.add(to_node)
+#         edges.append({"start": from_node, "end": to_node, "type": label})
+    
+#     gds_graph_name = "tempSubgraph"
+
+#     try:
+#         create_nodes_query = """
+#         UNWIND $nodes AS node_id
+#         MERGE (n:TempNode {id: node_id})
+#         """
+#         create_edges_query = """
+#         UNWIND $edges AS edge
+#         MATCH (start:TempNode {id: edge.start}), (end:TempNode {id: edge.end})
+#         MERGE (start)-[r:TempRel {type: edge.type}]->(end)
+#         """
+#         create_gds_graph_query = f"""
+#         CALL gds.graph.project(
+#             '{gds_graph_name}',
+#             'TempNode',
+#             {{
+#                 TempRel: {{
+#                     orientation: 'Undirected'
+#                 }}
+#             }}
+#         )
+#         """
+
+#         run_query(create_nodes_query, {"nodes": list(nodes)})
+#         run_query(create_edges_query, {"edges": edges})
+#         run_query(create_gds_graph_query, {})
+
+#         centrality_query = f"""
+#         CALL gds.eigenvector.stream('{gds_graph_name}')
+#         YIELD nodeId, score
+#         RETURN gds.util.asNode(nodeId).id AS node_id, score
+#         ORDER BY score DESC
+#         """
+#         centrality_results = run_query(centrality_query)
+
+#         cleanup_query = f"CALL gds.graph.drop('{gds_graph_name}') YIELD graphName"
+#         delete_temp_nodes = "MATCH (n:TempNode) DETACH DELETE n"
+#         run_query(cleanup_query)
+#         run_query(delete_temp_nodes)
+
+#         return Response({"degree_centrality": centrality_results}, status=200)
+    
+#     except Exception as e:
+#         cleanup_query = f"CALL gds.graph.drop('{gds_graph_name}') YIELD graphName"
+#         delete_temp_nodes = "MATCH (n:TempNode) DETACH DELETE n"
+#         run_query(cleanup_query)
+#         run_query(delete_temp_nodes)
+#         return Response({"error": str(e)}, status=500)
