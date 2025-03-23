@@ -433,8 +433,80 @@ RETURN {
 
 
 
+
 @api_view(['POST'])
 def aggregate_with_algo(request):
+    # Extract parameters from the request body
+    id_affaires = request.data.get('id_affaires', [1171])  # Default value if not provided
+    depth = int(request.data.get('depth', 3))  # Default depth if not provided
+    patterns = request.data.get('patterns', [
+        "-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-"
+    ])  # Default pattern if not provided
+
+    # Validate inputs
+    if depth < 1:
+        return JsonResponse({"error": "Depth must be at least 1."}, status=400)
+    if not patterns:
+        return JsonResponse({"error": "At least one pattern must be provided."}, status=400)
+
+    # Initialize the base query
+    query = """
+    UNWIND $id_affaires AS id_affaire
+    MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
+    WHERE c.identity = id_affaire
+    """
+
+    # Lists to collect nodes and relations
+    nodes = ["COLLECT(DISTINCT {identity: c.identity, type: 'Affaire'})", 
+             "COLLECT(DISTINCT {identity: p1.identity, type: 'Personne'})"]
+    relations = ["COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: 'Impliquer'})"]
+
+    # Build the query dynamically for each depth level and pattern
+    for i in range(1, depth):
+        # For each depth level, match any of the provided patterns
+        pattern_matches = []
+        for pattern in patterns:
+            # Convert the pattern into a Cypher MATCH clause
+            # Assuming patterns are strings like "-[:Rel1]-(:Node)-[:Rel2]-"
+            # We'll construct something like: (p{i})<pattern>(p{i+1}:Personne)
+            pattern_match = f"(p{i}){pattern}(p{i+1}:Personne)"
+            pattern_matches.append(pattern_match)
+
+        # Combine all pattern matches with OR logic
+        match_clause = "MATCH " + " OR ".join(pattern_matches)
+        query += f"""
+        {match_clause}
+        WHERE id_affaire IN p{i+1}._affiresoutin AND p{i+1}._Lvl_of_Implications[{i}] > p{i}._Lvl_of_Implications[{i-1}]
+        """
+        nodes.append(f"COLLECT(DISTINCT {{identity: p{i+1}.identity, type: 'Personne'}})")
+        # For relations, dynamically infer the relation type from the pattern (simplified here)
+        relations.append(f"COLLECT(DISTINCT {{source: p{i}.identity, target: p{i+1}.identity, relation: 'PatternMatch'}})")
+
+    # Finalize the query
+    query += f"""
+    WITH 
+        {' + '.join(nodes)} AS nodes,
+        {' + '.join(relations)} AS relations
+    RETURN {{
+        nodes: nodes,
+        relations: relations
+    }} AS Result;
+    """
+
+    # Debugging: Print the generated query
+    print(query)
+
+    # Execute the query
+    params = {"id_affaires": id_affaires, "depth": depth}
+    data = run_query(query, params)
+
+    # Return the result as a JSON response
+    return JsonResponse(data, safe=False)
+
+
+
+@api_view(['POST'])
+def aggregate_with_algo_old(request):
     # Extract the id_affaires and depth from the request body
     id_affaires = request.data.get('id_affaires', [1171])  # Default value if not provided
     depth = int(request.data.get('depth', 3))  # Default depth if not provided
