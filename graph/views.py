@@ -488,6 +488,7 @@ from neo4j import GraphDatabase
 # driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
 
 
+
 @api_view(['POST'])
 def personne_criminal_network(request):
     # Get properties from request body
@@ -538,7 +539,7 @@ def personne_criminal_network(request):
         )
     
 
-    
+
 
 @api_view(['POST'])
 def personne_criminal_network_old(request):
