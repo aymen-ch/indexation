@@ -24,6 +24,43 @@ def fetch_distinct_relations(request):
         return Response({"distinct_relationships": result[0]['distinct_relationships']}, status=200)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+    
+
+@api_view(['POST'])
+def Secteur_Activite(request):
+    query = """
+    // Match Personne nodes where 'soutien' is in their class array
+    MATCH (p:Personne)
+    WHERE 'soutien' IN p._class
+
+    // Iterate over each affiresoutin ID
+    WITH p, p._affiresoutin AS affaireIds
+    UNWIND affaireIds AS affaireId
+
+    // Match the Affaire, Unite, Commune, Daira, and Wilaya nodes
+    MATCH (affaire:Affaire {identity: affaireId})-[:Traiter]-(unite:Unite)-[:situer]-(comune:Commune)-[:appartient]-(daira:Daira)-[:appartient]-(wilaya:Wilaya)
+
+    // Collect nom_arabe values without redundancy
+    WITH p, 
+        collect(DISTINCT comune.nom_arabe) AS comuneActivite, 
+        collect(DISTINCT daira.nom_arabe) AS dairaActiviti, 
+        collect(DISTINCT wilaya.nom_arabe) AS wiliyaActiviti
+
+    // Empty the lists first, then set with new values
+    SET p._comune_Activite = [],    // Clear the list
+        p._daira_activiti = [],     // Clear the list
+        p._wiliya_Activiti = []     // Clear the list
+    SET p._comune_Activite = comuneActivite,
+        p._daira_activiti = dairaActiviti,
+        p._wiliya_Activiti = wiliyaActiviti
+"""
+    
+    try:
+        result = run_query(query)
+         # Return the result as a JSON response
+        return JsonResponse(result, safe=False)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
 
 @api_view(['POST'])

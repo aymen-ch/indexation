@@ -10,6 +10,7 @@ urlpatterns = [
     ############################### Analysis ################################### 
     path('Node_clasification/', analyse_view.Node_clasification, name='Node_clasification'),
     path('fetch_distinct_relations/', analyse_view.fetch_distinct_relations, name='fetch_distinct_relations'),
+    path('Secteur_Activite/', analyse_view.Secteur_Activite, name='Secteur_Activite'),
     ############################### aggregation ###################################  
     path('agregate/', view.aggregate, name='agregate_context'),
     path('aggregatehria/', view.aggregate_hira, name='aggre_hira'),
@@ -24,7 +25,11 @@ urlpatterns = [
     path('node-types/properties/', views.get_node_properties, name='get_node_properties'),
     path('search-nodes/', views.search_nodes, name='search_nodes'),
     path('get_node_relationships/', views.get_node_relationships, name='get_node_relationships'),
+<<<<<<< HEAD
     path('searchonnode/', views.searchonnode, name='searchonnode'),
+=======
+    path('personne_criminal_network/', views.personne_criminal_network, name='personne_criminal_network'),
+>>>>>>> a8a05735c7813f9899d8167a6d8993cb17c83ba3
     #################################contextualization#################################
     path('daira_and_commune/', context_view.get_daira_and_commune, name='get_daira_and_commune'),
     path('filter_affaire_relations/', context_view.filter_affaire_relations, name='filter_affaire_relations'),
