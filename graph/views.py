@@ -50,11 +50,11 @@ def getdata(request):
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+    
 @api_view(['POST'])
-def searchonnode(request):
-    # Extract the search value from the request data
+def recherche(request):
     search_value = request.data.get('query')
-    print(search_value)
+    print(f"Search query: {search_value}")
     
     if not search_value:
         return Response(
@@ -63,48 +63,158 @@ def searchonnode(request):
         )
     
     try:
-        # Step 1: Get all full-text index names
-        index_query = """
-        SHOW FULLTEXT INDEXES
-        YIELD name
-        RETURN collect(name) AS index_names
-        """
-        
-        # Step 2: Search query template for each index
-        search_query = """
-        UNWIND $index_names AS index_name
-        CALL db.index.fulltext.queryNodes(index_name, $search_value)
-        YIELD node, score
-        RETURN labels(node)[0] AS type, node.identity AS identity, properties(node) AS properties, score
-        """
-        
         with driver.session() as session:
-            # Execute the index query first
-            index_result = session.run(index_query)
+            # Step 1: Handle node full-text indexes
+            index_count_query = """
+            SHOW FULLTEXT INDEXES
+            YIELD name, type, entityType
+            WHERE entityType = 'NODE'
+            RETURN count(name) AS index_count, collect(name) AS index_names
+            """
+            index_result = session.run(index_count_query)
             index_record = index_result.single()
-            if not index_record or not index_record["index_names"]:
+            node_index_count = index_record["index_count"] if index_record else 0
+            node_index_names = index_record["index_names"] if index_record else []
+
+            label_count_query = """
+            MATCH (n)
+            UNWIND labels(n) AS label
+            WITH DISTINCT label
+            WHERE label <> 'neo4jImportId'
+            RETURN count(label) AS label_count, collect(label) AS labels
+            """
+            label_result = session.run(label_count_query)
+            label_record = label_result.single()
+            label_count = label_record["label_count"]
+            all_labels = label_record["labels"]
+
+            if node_index_count < label_count:
+                existing_index_labels = [name.replace("index_", "") for name in node_index_names]
+                missing_labels = [label for label in all_labels if label not in existing_index_labels]
+
+                for label in missing_labels:
+                    properties_query = """
+                    MATCH (n:%s)
+                    UNWIND keys(n) AS property
+                    RETURN collect(DISTINCT property) AS properties
+                    """ % label
+                    prop_result = session.run(properties_query)
+                    prop_record = prop_result.single()
+                    properties = prop_record["properties"] if prop_record else []
+
+                    if properties:
+                        property_list = ", ".join([f"n.`{prop}`" for prop in properties])
+                        create_index_query = f"""
+                        CREATE FULLTEXT INDEX index_{label} IF NOT EXISTS
+                        FOR (n:{label}) ON EACH [{property_list}]
+                        OPTIONS {{ indexConfig: {{ `fulltext.analyzer`: 'standard-no-stop-words' }} }}
+                        """
+                        session.run(create_index_query)
+                        print(f"Created node index for {label}: {create_index_query}")
+
+                updated_node_result = session.run(index_count_query)
+                updated_node_record = updated_node_result.single()
+                node_index_names = updated_node_record["index_names"]
+
+            # Step 2: Handle relationship full-text indexes
+            rel_index_count_query = """
+            SHOW FULLTEXT INDEXES
+            YIELD name, type, entityType
+            WHERE entityType = 'RELATIONSHIP'
+            RETURN count(name) AS rel_index_count, collect(name) AS rel_index_names
+            """
+            rel_index_result = session.run(rel_index_count_query)
+            rel_index_record = rel_index_result.single()
+            rel_index_count = rel_index_record["rel_index_count"] if rel_index_record else 0
+            rel_index_names = rel_index_record["rel_index_names"] if rel_index_record else []
+
+            rel_type_count_query = """
+            MATCH ()-[r]->()
+            WITH DISTINCT type(r) AS rel_type
+            RETURN count(rel_type) AS rel_type_count, collect(rel_type) AS rel_types
+            """
+            rel_type_result = session.run(rel_type_count_query)
+            rel_type_record = rel_type_result.single()
+            rel_type_count = rel_type_record["rel_type_count"]
+            all_rel_types = rel_type_record["rel_types"]
+
+            if rel_index_count < rel_type_count:
+                existing_rel_indexes = [name for name in rel_index_names]
+                for rel_type in all_rel_types:
+                    index_name = f"index_{rel_type.lower()}_rel"
+                    if index_name not in existing_rel_indexes:
+                        rel_properties_query = """
+                        MATCH ()-[r:%s]->()
+                        UNWIND keys(r) AS property
+                        RETURN collect(DISTINCT property) AS properties
+                        """ % rel_type
+                        rel_prop_result = session.run(rel_properties_query)
+                        rel_prop_record = rel_prop_result.single()
+                        rel_properties = rel_prop_record["properties"] if rel_prop_record else []
+
+                        if rel_properties:
+                            rel_property_list = ", ".join([f"r.`{prop}`" for prop in rel_properties])
+                            create_rel_index_query = f"""
+                            CREATE FULLTEXT INDEX {index_name} IF NOT EXISTS
+                            FOR ()-[r:{rel_type}]-() ON EACH [{rel_property_list}]
+                            OPTIONS {{ indexConfig: {{ `fulltext.analyzer`: 'standard-no-stop-words' }} }}
+                            """
+                            session.run(create_rel_index_query)
+                            print(f"Created relationship index for {rel_type}: {create_rel_index_query}")
+
+                updated_rel_result = session.run(rel_index_count_query)
+                updated_rel_record = updated_rel_result.single()
+                rel_index_names = updated_rel_record["rel_index_names"]
+
+            # Step 3: Check if there are any indexes to search
+            if not node_index_names and not rel_index_names:
                 return Response(
-                    {"error": "No full-text indexes found."},
+                    {"error": "No full-text indexes available for search."},
                     status=status.HTTP_404_NOT_FOUND
                 )
-            index_names = index_record["index_names"]
-            
-            # Execute the search query with the collected index names
+
+            # Step 4: Search nodes and relationships with full-text capabilities
+            search_query = ""
+            if node_index_names:
+                search_query += """
+                UNWIND $node_index_names AS node_index_name
+                CALL db.index.fulltext.queryNodes(node_index_name, $search_value) YIELD node, score
+                RETURN labels(node)[0] AS type, node.identity AS identity, properties(node) AS properties, score
+                """
+            if rel_index_names:
+                if node_index_names:
+                    search_query += " UNION "
+                search_query += """
+                UNWIND $rel_index_names AS rel_index_name
+                CALL db.index.fulltext.queryRelationships(rel_index_name, $search_value) YIELD relationship, score
+                RETURN type(relationship) AS type, relationship.identity AS identity, properties(relationship) AS properties, score
+                """
+
+            if not search_query:
+                return Response(
+                    {"error": "No search query generated."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            # Enhance search_value for broader matching if needed
+            # Example: Add wildcard if not already a Lucene query
+            if not any(c in search_value for c in ['*', '?', '"', '+', '-', 'AND', 'OR', 'NOT']):
+                search_value = f"{search_value}*"  # Add wildcard for partial matching
+
             results = session.run(search_query, {
                 "search_value": search_value,
-                "index_names": index_names
+                "node_index_names": node_index_names,
+                "rel_index_names": rel_index_names
             })
             records = list(results)
 
-           
-
-            # Process all results into a list of dictionaries
+            # Step 5: Process results into a response
             response_data = [
                 {
-                    "identity": record["identity"],         # Node's internal identity
-                    "properties": record["properties"],     # All node properties
-                    "score": record["score"],               # Relevance score
-                    "type": record["type"]                  # First label as type
+                    "identity": record["identity"],
+                    "properties": record["properties"],
+                    "score": record["score"],
+                    "type": record["type"]
                 }
                 for record in records
             ]
