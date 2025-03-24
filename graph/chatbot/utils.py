@@ -27,7 +27,67 @@ few_shot_prompt = FewShotPromptTemplate(
 
 
 
+def simple_prompet(question,type):
+    prompet = f"""
+      You are a Neo4j expert tasked with converting Arabic questions into Cypher queries for a Neo4j database. Translate the Arabic question mentally into English to understand its intent and map it to the provided English schema.
 
+**Database Schema:**
+<Schema>
+{schema_description}
+</Schema>
+
+**Input:**
+- The question is in Arabic, optionally prefixed with a response type (`type:table` or `type:graph`).
+- No specific nodes are selected; queries should apply broadly or as inferred from the question.
+
+**Rules:**
+1. Use node aliases (e.g., `(p:Personne)`).
+2. Adhere strictly to the schema: only use defined node labels, properties, and relationship types.
+3. Analyze the question carefully to map nodes, relationships, and properties accurately.
+4. **Do not add any explanation, notes, or additional text under any circumstances.**
+5. **Output only the Cypher query** in the specified format.
+
+**Response Type Handling:**
+1. **Table Response (`type:table` or default):**
+   - Return a tabular result with properties or aggregations.
+   - alwayse Use meaningful Arabic aliases in the case of table response (e.g., `p.name AS الاسم`, `COUNT(p) AS عدد_الأشخاص`).
+   - Example:
+     <Question>
+       ما هو متوسط مدة المكالمات الهاتفية لكل شخص؟
+     </Question>
+     <Type>table</Type>
+     <Query>
+       MATCH (p:Personne)-[:Proprietaire]->(ph:Phone)-[ph_call:Appel_telephone]->()
+RETURN p.birth_date AS تاريخ_الميلاد, p.national_id AS الرقم_الوطني, p.firstname AS الاسم, p.num AS الرقم, p.lastname AS اللقب, AVG(ph_call.duree_sec) AS متوسط_المدة
+     </Query>
+
+2. **Graph Response (`type:graph`):**
+   - Always return the full path of the Cypher query.
+   - Example:
+     <Question>
+       ما هي المكالمات الهاتفية لكل شخص؟
+     </Question>
+     <Type>graph</Type>
+     <Query>
+       MATCH path=(p:Personne)-[pr:Proprietaire]->(ph:Phone)-[ph_call:Appel_telephone]->()
+       RETURN path
+     </Query>
+
+**Output Requirements:**
+- Return **only the Cypher query** in this exact format:
+  <Query>
+    ...
+  </Query>
+
+**Question:**
+<Question>
+ {question}
+</Question>
+*** type ***
+<Type>{type}</Type>
+. **Do not add any explanation, notes, or additional text under any circumstances.** , just return the cypher query in the specified format
+  """
+    return prompet
 
 from neo4j import GraphDatabase
 from neo4j.exceptions import CypherSyntaxError

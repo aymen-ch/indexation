@@ -229,7 +229,6 @@ def recherche(request):
     
 @api_view(['POST'])
 def getrelationData(request):
-    # Extract the identity and path from the request data
     identity = request.data.get('identity')
     path = request.data.get('path')
     print(f"Identity: {identity}, Path: {path}")
@@ -241,16 +240,13 @@ def getrelationData(request):
         )
 
     try:
-        # Check if it's a virtual relation (contains hyphen)
         if isinstance(identity, str) and '-' in identity:
-            # Validate path exists and has odd length (to have a middle)
-            if not path or not isinstance(path, list) or len(path) % 2 == 0:
+            if not path or not isinstance(path, list) or len(path) % 2 == 0 or len(path) < 3:
                 return Response(
-                    {"error": "A valid path array with odd length is required for virtual relations."},
+                    {"error": "A valid path array with odd length >= 3 is required for virtual relations."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Split the compound identity and convert to integers
             try:
                 start_id, end_id = map(int, identity.split('-'))
             except ValueError:
@@ -259,44 +255,40 @@ def getrelationData(request):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Build the Cypher query dynamically
-            middle_index = len(path) // 2
-            middle_relation = path[middle_index]
+            # Calculate the index of the middle relation
+            num_relations = (len(path) - 1) // 2  # Number of relations
+            middle_rel_index = num_relations // 2  # Index of the middle relation
+            middle_relation = path[middle_rel_index * 2 + 1]  # Middle relation type
             
-            # Construct the MATCH pattern
             match_clauses = []
             for i in range(0, len(path) - 1, 2):
                 node1 = path[i]
                 rel = path[i + 1]
                 node2 = path[i + 2]
                 
-                # Use different variable names for each step
+                # Node variables should be unique and sequential
                 n1_var = f"n{i//2}"
                 n2_var = f"n{i//2 + 1}"
-                rel_var = f"r{i//2}"
-                
+                rel_var = "r" if i // 2 == middle_rel_index else f"r{i//2}"
+                print(rel_var)
                 if i == 0:
-                    # First node with start_id
+                    # First segment with start_id
                     pattern = f"({n1_var}:{node1} {{identity: $start_id}})-[{rel_var}:{rel}]-({n2_var}:{node2})"
-                elif i == len(path) - 3:
-                    # Last node with end_id
-                    pattern = f"({n1_var}:{node1})-[{rel_var}:{rel}]-({n2_var}:{node2} {{identity: $end_id}})"
                 else:
-                    # Middle relations, keep track of the middle one
-                    if i == middle_index - 1:
-                        pattern = f"({n1_var}:{node1})-[r:{rel}]-({n2_var}:{node2})"
-                    else:
-                        pattern = f"({n1_var}:{node1})-[{rel_var}:{rel}]-({n2_var}:{node2})"
+                    # Subsequent segments
+                    pattern = f"-[{rel_var}:{rel}]-({n2_var}:{node2})"
+                    if i == len(path) - 3:
+                        pattern = f"-[{rel_var}:{rel}]-({n2_var}:{node2} {{identity: $end_id}})"
                 
                 match_clauses.append(pattern)
 
-            # Construct the complete query with proper Cypher syntax
+            # Join the clauses into a single continuous path
             query = (
-                f"MATCH {', '.join(match_clauses)}\n"
+                f"MATCH {''.join(match_clauses)}\n"
                 "WITH collect(r) as relations\n"
                 f"RETURN {{type: '{middle_relation}', count: size(relations), detail: [rel in relations | {{identity: rel.identity, properties: properties(rel)}}]}} as relation_data"
             )
-            
+            print(query)
             
             with driver.session() as session:
                 results = session.run(query, {
@@ -312,21 +304,19 @@ def getrelationData(request):
                     )
 
                 relation_data = records[0]["relation_data"]
-                # Transform the detail list into a dictionary with relation numbering
                 formatted_relation = {
                     "type": relation_data["type"],
                     "count": relation_data["count"],
-                    "identity":identity,
+                    "identity": identity,
                     "detail": {
                         f"{middle_relation.lower()}{i+1}": rel 
                         for i, rel in enumerate(relation_data["detail"])
                     }
                 }
-                print(relation_data)  # For debugging
+                print(relation_data)
                 return Response(formatted_relation, status=status.HTTP_200_OK)
 
         else:
-            # Handle normal identity case
             try:
                 identity = int(identity)
             except ValueError:
@@ -362,8 +352,6 @@ def getrelationData(request):
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-    
-
 
 # Execute query using Neo4j driver
 @api_view(['GET'])

@@ -34,6 +34,7 @@ def execute_query(request):
         # Handle any errors
         return JsonResponse({'error': str(e)}, status=500)
     
+import re
 def validate_query(generated_query, schema_description, error):
     validation_prompt = f"""
 Given the following Neo4j database schema:
@@ -61,9 +62,18 @@ def chatbot(request):
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Generate the Cypher query using the LLM
-        formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
-        cypher_query = call_ollama(formatted_prompt, model="hf.co/DavidLanz/text2cypher-gemma-2-9b-it-finetuned-2024v1:latest")
-        
+        # formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
+        prompt = simple_prompet(question=question,type=answer_type)
+        # cypher_response = call_ollama(prompt=prompt, model="tomasonjo/codestral-text2cypher:latest")
+        cypher_response="""
+MATCH (w:Wilaya)<-[:appartient]-(d:Daira)<-[:appartient]-(co:Commune)-[:situer]-(:Unite)-[:Traiter]->(a:Affaire) WITH w, COUNT(a) AS NumberOfCases ORDER BY NumberOfCases DESC LIMIT 1 RETURN NumberOfCases as  عدد_القضايا,w.nom_arabe as الولاية_الأكثر_تعرضا_للقضايا
+"""
+        # Extract the query between <Query> tags
+        query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
+        if query_match:
+            cypher_query = query_match.group(1).strip()
+        else:
+            cypher_query = cypher_response  # Fallback if no tags are found
         # Replace specific terms in the Cypher query
         cypher_query = cypher_query.replace("nationel_id", "`رقم التعريف الوطني`")
         cypher_query = cypher_query.replace("birth_date", "`تاريخ الميلاد`")
@@ -78,7 +88,8 @@ def chatbot(request):
         if not success:
             # If the query execution fails, attempt to validate and correct it
             print(f"Query failed with error: {query_result}")
-            corrected_query = validate_query(cypher_query, schema_description, query_result)
+            # corrected_query = validate_query(cypher_query, schema_description, query_result)
+            corrected_query=cypher_query
             print("Corrected Cypher Query:", corrected_query)
             
             # Re-execute the corrected query
@@ -100,6 +111,8 @@ def chatbot(request):
         # Handle response based on answer type
         if answer_type == 'graph':
             return JsonResponse({"cypher":cypher_query}, status=status.HTTP_200_OK)
+        if answer_type == 'table':
+            return JsonResponse({"cypher":cypher_query}, status=status.HTTP_200_OK)
 
         elif answer_type == 'JSON':
             # Return the query result and Cypher query as JSON
@@ -112,13 +125,9 @@ def chatbot(request):
             )
 
         else:
-            # For 'Text' answer type, generate a human-readable response
-            formatted_table_prompt = zero_shot_prompt.format(input_question=question, Cypher=cypher_query, input_context=query_result)
-            answer = call_ollama(formatted_table_prompt, model="hf.co/DavidLanz/text2cypher-gemma-2-9b-it-finetuned-2024v1:latest")
-            
             return Response(
                 {
-                    "response": answer,
+                    "response": query_result,
                     "cypher_query": cypher_query
                 },
                 status=status.HTTP_200_OK
