@@ -182,7 +182,7 @@ def calculate_betweenness_centrality(request):
     Returns statistics about the calculation process.
     """
     try:
-       
+        
 
         # Step 1: Create temporary relationships
         

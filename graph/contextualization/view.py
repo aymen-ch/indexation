@@ -68,7 +68,7 @@ def get_all_affaire_types(request):
 def filter_affaire_relations(request):
     try:
         # Extract parameters from the request
-        affaire_type = request.data.get('Affaire_type')  # Required
+        affaire_types = request.data.get('Affaire_type', [])  # Required
         wiliaya_id = request.data.get('wilaya_id', None)
         daira_id = request.data.get('daira_id', None)
         commune_id = request.data.get('commune_id', None)
@@ -78,14 +78,15 @@ def filter_affaire_relations(request):
         depth = int(request.data.get('depth', 1))  # Default depth is 1
 
         # Validate required parameters
-        if not affaire_type:
-            return JsonResponse({"error": "Affaire_type is required."}, status=400)
+        if not affaire_types:  # Check if the list is empty
+            return JsonResponse({"error": "At least one Affaire_type is required."}, status=400)
 
         # Base MATCH clause to get the starting crime node
         match_clause = """
         MATCH (crime:Affaire)
-        WHERE crime.Type = $affaire_type
+        WHERE crime.Type IN $affaire_types
         """
+        print("affaire_types" ,affaire_types )
 
         # Add filters for optional parameters
         if wiliaya_id:
@@ -142,7 +143,7 @@ def filter_affaire_relations(request):
 
         # Set query parameters
         params = {
-            "affaire_type": affaire_type,
+           "affaire_types": affaire_types,  # Changed to plural
             "wiliaya_id": wiliaya_id,
             "daira_id": daira_id,
             "commune_id": commune_id,
