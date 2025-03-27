@@ -80,7 +80,6 @@ def recherche(request):
             MATCH (n)
             UNWIND labels(n) AS label
             WITH DISTINCT label
-            WHERE label <> 'neo4jImportId'
             RETURN count(label) AS label_count, collect(label) AS labels
             """
             label_result = session.run(label_count_query)

@@ -9,7 +9,7 @@ from graph.utility import run_query
 def aggregate(request):
     id_nodes = request.data.get("node_ids", [1160, 126224, 129664, 129668, 136220, 1368, 1370, 34151, 34155])  # List of node IDs
     aggregation_type = request.data.get("aggregation_type", [["Personne", "Impliquer", "Affaire", "Impliquer", "Personne"]])
-
+    type = request.data.get("type","memeaffaire")
     if not id_nodes:
         return Response({"error": "id_nodes parameter is required"}, status=400)
 
@@ -77,8 +77,8 @@ def aggregate(request):
         WITH 
             CASE 
                 WHEN start_node.identity < end_node.identity 
-                THEN {{startId: start_node.identity, endId: end_node.identity, type: "{sublist[3]}", count: count}}
-                ELSE {{startId: end_node.identity, endId: start_node.identity, type: "{sublist[3]}", count: count}}
+                THEN {{startId: start_node.identity, endId: end_node.identity, type:'{type}' , count: count}}
+                ELSE {{startId: end_node.identity, endId: start_node.identity, type: '{type}', count: count}}
             END AS relationship,
             COLLECT(DISTINCT {{
                 identity: start_node.identity,
