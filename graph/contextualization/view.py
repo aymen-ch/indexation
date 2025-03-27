@@ -77,10 +77,16 @@ def filter_affaire_relations(request):
         node_types = request.data.get('selectedNodeTypes', [])  # Optional list of types
         depth = int(request.data.get('depth', 1))  # Default depth is 1
 
+        print("node types"  ,node_types)
         # Validate required parameters
         if not affaire_types:  # Check if the list is empty
             return JsonResponse({"error": "At least one Affaire_type is required."}, status=400)
+        
+        label_filter = "-Affaire"  # Always exclude Affaire
+        if node_types:  # If specific node types are provided, whitelist them
+            label_filter = f"{'|'.join('+' + nt for nt in node_types)},-Affaire"
 
+        print("lable filters ", label_filter)
         # Base MATCH clause to get the starting crime node
         match_clause = """
         MATCH (crime:Affaire)
@@ -118,7 +124,8 @@ def filter_affaire_relations(request):
         CALL apoc.path.expandConfig(crime, {{
             minLevel: 0,
             maxLevel: $depth,
-            uniqueness: 'NODE_PATH'
+            uniqueness: 'NODE_PATH',
+            labelFilter: '{label_filter}'
         }}) YIELD path
         WITH crime, 
              [node IN nodes(path) | node] AS path_nodes,
@@ -152,6 +159,7 @@ def filter_affaire_relations(request):
             "depth": depth
         }
 
+        print("parms form contextualiaaiton" , params)
         # Execute the query
         print("start excution")
         results = run_query(query, params)
