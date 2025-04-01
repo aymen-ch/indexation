@@ -7,10 +7,12 @@ from django.http import JsonResponse
 from datetime import datetime
 import uuid
 from .utility import fetch_node_types, fetch_node_properties,driver
+from django.conf import settings
 
 
 def run_query(query, params=None):
-    with driver.session() as session:
+    print("NEO4J_DATABASE !m!" ,settings.NEO4J_DATABASE)
+    with driver.session(database=settings.NEO4J_DATABASE) as session:
         results = session.run(query, params or {})
         return [record.data() for record in results]
 

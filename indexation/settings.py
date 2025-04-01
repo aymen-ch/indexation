@@ -17,7 +17,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 NEO4J_URI = "bolt://localhost:7687"
 NEO4J_USERNAME = "neo4j"
 NEO4J_PASSWORD = "12345678"
-NEO4J_DATABASE="newimportedfle"
+NEO4J_DATABASE="neo4j"
+# NEO4J_DB_Name = "test1"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
