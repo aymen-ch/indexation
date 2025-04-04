@@ -1,10 +1,74 @@
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
-from graph.utility import run_query
+import neo4j 
+from graph.utility import run_query,driver
 
 # //////////////  neeed to aggregate properties /////////
+
+
+
+@api_view(['POST'])
+def ExpandAggregation(request):
+    # Get data from request
+    id_nodes = request.data.get("node_ids", [1160, 126224])  # Default to example IDs
+    aggregation_path = request.data.get("aggregationpath", ["Personne", "Impliquer", "Affaire", "Impliquer", "Personne"])
+
+    # Validate input
+    if not isinstance(id_nodes, list) or len(id_nodes) < 2:
+        return Response({"error": "At least two node IDs are required"}, status=400)
+    if not isinstance(aggregation_path, list) or len(aggregation_path) < 3:
+        return Response({"error": "Invalid aggregation path"}, status=400)
+
+    # Build the Cypher query
+    try:
+        # Construct the MATCH pattern dynamically
+        # Example: MATCH (p1:Personne {identity: 1160})-[:Impliquer]->(a:Affaire)-[:Impliquer]->(p2:Personne {identity: 126224})
+        start_node = aggregation_path[0]  # e.g., "Personne"
+        end_node = aggregation_path[-1]   # e.g., "Personne"
+        relationships = aggregation_path[1:-1]  # e.g., ["Impliquer", "Affaire", "Impliquer"]
+
+        # Build the relationship pattern
+        pattern_parts = []
+        current_var = 'n0'  # Starting variable for first node
+        for i, part in enumerate(relationships):
+            next_var = f'n{i+1}'
+            if i % 2 == 0:  # Relationship
+                pattern_parts.append(f'-[:{part}]-')
+            else:  # Node
+                pattern_parts.append(f'({next_var}:{part})')
+            current_var = next_var
+
+        # Construct the full Cypher query
+        query = (
+            f"MATCH path=(n0:{start_node} {{identity: {id_nodes[0]}}})"
+            f"{''.join(pattern_parts)}"
+            f"({current_var}:{end_node} {{identity: {id_nodes[-1]}}}) "
+            "RETURN  path"
+        )
+
+     
+
+        # Execute the query using the utility function
+        graph_result = driver.execute_query(query_=query,
+            result_transformer_=neo4j.Result.graph,
+        )
+        for node in graph_result.nodes:
+    # Extract the required parts
+                identity = node.get('properties')  # From properties dictionary
+
+                print(identity)
+        # Process the result
+        return Response({
+            "nodes": "hh",
+        
+        }, status=200)
+           
+
+    except Exception as e:
+        print(f"Error executing query: {str(e)}")
+        return Response({"error": f"Query failed: {str(e)}"}, status=500)
+
 @api_view(['POST'])
 def aggregate(request):
     id_nodes = request.data.get("node_ids", [1160, 126224, 129664, 129668, 136220, 1368, 1370, 34151, 34155])  # List of node IDs
@@ -47,7 +111,10 @@ def aggregate(request):
         match_clause = "MATCH " + "".join(match_clause)
 
         # Construct the WHERE clause to filter by node IDs
-        intermediate_aliases = aliases[1:-1]  # Exclude the first and last aliases
+        if len(sublist)==3:
+           intermediate_aliases = aliases  # Exclude the first and last aliases
+        else:
+            intermediate_aliases = aliases[1:-1]
         if intermediate_aliases:  # Only add WHERE clause if there are intermediate nodes
             where_clause = "WHERE " + " AND ".join([f"{alias}.identity IN $id_nodes" for alias in intermediate_aliases])
         else:
@@ -122,7 +189,7 @@ def aggregate(request):
         }) AS nodes,
         combined_relationships AS relationships
     """
-
+    print(combined_query)
     try:
         # Run the query using the provided helper function
         results = run_query(combined_query, params)

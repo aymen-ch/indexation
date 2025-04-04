@@ -271,8 +271,11 @@ def getrelationData(request):
                 rel_var = "r" if i // 2 == middle_rel_index else f"r{i//2}"
                 print(rel_var)
                 if i == 0:
-                    # First segment with start_id
-                    pattern = f"({n1_var}:{node1} {{identity: $start_id}})-[{rel_var}:{rel}]-({n2_var}:{node2})"
+                    if len(path) == 3:  # Special case for length 3
+                        pattern = f"({n1_var}:{node1} {{identity: $start_id}})-[{rel_var}:{rel}]-({n2_var}:{node2} {{identity: $end_id}})"
+                    else:
+                        # First segment with start_id
+                        pattern = f"({n1_var}:{node1} {{identity: $start_id}})-[{rel_var}:{rel}]-({n2_var}:{node2})"
                 else:
                     # Subsequent segments
                     pattern = f"-[{rel_var}:{rel}]-({n2_var}:{node2})"
