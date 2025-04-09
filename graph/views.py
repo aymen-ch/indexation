@@ -388,7 +388,6 @@ def get_node_properties(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 
-
 @api_view(['POST'])
 def search_nodes(request):
     try:
@@ -448,12 +447,12 @@ def search_nodes(request):
                 )
 
         if not match_conditions:
-            query = f"MATCH (n:{node_type}) RETURN n"
+            query = f"MATCH (n:{node_type}) RETURN n, id(n) AS node_id"
         else:
             query = f"""
             MATCH (n:{node_type})
             WHERE {' AND '.join(match_conditions)}
-            RETURN n
+            RETURN n, id(n) AS node_id
             """
 
         # Debugging logs
@@ -462,12 +461,13 @@ def search_nodes(request):
 
         with driver.session() as session:
             result = session.run(query, parameters)
-            nodes = [record['n'] for record in result]  # Extract nodes from the result
+            nodes = [{'properties': record['n'], 'id': record['node_id']} for record in result]  # Extract nodes and IDs
 
         formatted_nodes = []
         for node in nodes:
-            # Exclude 'elementId' and 'identity' properties
-            filtered_node = {key: value for key, value in dict(node).items() if key not in ['elementId']}
+            # Exclude 'elementId' from properties and set 'identity' to the Neo4j ID
+            filtered_node = {key: value for key, value in dict(node['properties']).items() if key not in ['elementId']}
+            filtered_node['identity'] = node['id']  # Map Neo4j ID to 'identity'
             formatted_nodes.append(filtered_node)
 
         return Response(
@@ -692,7 +692,8 @@ def personne_criminal_network_old(request):
         return Response(
             {"error": f"Error executing query: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )   
+        )  
+
 @api_view(['POST'])
 def get_node_relationships(request):
     # Get data from the request body
@@ -715,7 +716,7 @@ def get_node_relationships(request):
         match_conditions.append(f"n.`{key}` = $`{key}`")
         parameters[key] = value
 
-    # Base Cypher query with relationships
+    # Base Cypher query with relationships, returning Neo4j IDs
     query = f"""
     MATCH (n:{node_type})-[r]-(related)
     WHERE {' AND '.join(match_conditions)}
@@ -726,9 +727,10 @@ def get_node_relationships(request):
         query += f" AND type(r) = $relation_type"
         parameters['relation_type'] = relation_type
 
-    # Complete the query
+    # Complete the query, returning Neo4j IDs for nodes and relationships
     query += """
-    RETURN n, related, r, type(r) AS relationship, labels(related) AS related_labels
+    RETURN n, id(n) AS node_id, related, id(related) AS related_id, r, id(r) AS rel_id, 
+           type(r) AS relationship, labels(related) AS related_labels
     LIMIT 100
     """
 
@@ -746,25 +748,31 @@ def get_node_relationships(request):
             relationships = []
             for record in result:
                 node = record["n"]
+                node_id = record["node_id"]  # Neo4j ID for the main node
                 related_node = record["related"]
+                related_id = record["related_id"]  # Neo4j ID for the related node
                 relationship = record["r"]
+                rel_id = record["rel_id"]  # Neo4j ID for the relationship
                 relationship_type = record["relationship"]
-                related_labels = record["related_labels"]  # This will contain the list of labels (node types) for the related node
+                related_labels = record["related_labels"]  # List of labels for the related node
 
-                # Remove 'elementId' and 'identity' from both the main node and the related node
-                node_dict = {key: value for key, value in dict(node).items() if key not in ['elementId', 'identity']}
+                # Remove 'elementId' from both the main node and the related node
                 related_node_dict = {key: value for key, value in dict(related_node).items() if key not in ['elementId']}
                 relationship_dict = {key: value for key, value in dict(relationship).items() if key not in ['elementId']}
 
+                # Add Neo4j IDs to the dictionaries
+                related_node_dict['identity'] = related_id  # Map related node's ID to 'identity'
+                relationship_dict['identity'] = rel_id  # Map relationship's ID to 'identity'
+
                 relationships.append({
                     "related": {
-                        "node_type": list(related_labels)[0],
-                        "properties": related_node_dict  # Add the related node without unwanted properties
+                        "node_type": list(related_labels)[0],  # Use the first label as node_type
+                        "properties": related_node_dict  # Include Neo4j ID as 'identity'
                     },
                     "relationship": {
-                        "identity": relationship_dict.get("identity"),
+                        "identity": rel_id,  # Use Neo4j relationship ID directly here
                         "type": relationship_type,  # Relationship type
-                        "properties": relationship_dict  # Relationship properties
+                        "properties": relationship_dict  # Include Neo4j ID as 'identity'
                     }
                 })
 
