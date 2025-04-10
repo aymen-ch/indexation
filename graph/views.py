@@ -23,13 +23,15 @@ def parse_to_graph_with_transformer(query, params=None, database=None):
     """
     try:
         # Execute the query with the graph result transformer
+        print('hi :' , settings.NEO4J_DATABASE)
         graph_result = driver.execute_query(
             query,
             params or {},
-            database_=database or settings.NEO4J_DATABASE,
+            database_=settings.NEO4J_DATABASE,
             result_transformer_=neo4j.Result.graph
         )
-        
+        print('hi 2:' , query)
+        print('hi 3:' , graph_result)
         # Initialize lists for nodes and edges
         nodes = {}
         edges = {}
@@ -526,36 +528,27 @@ def get_possible_relations(request):
     # Get data from the request body
     print(request.data)
     node_type = request.data.get('node_type')
-    properties = request.data.get('properties', {})
+    id = request.data.get('id',12)
 
-    if not node_type or not isinstance(properties, dict):
-        return Response(
-            {"error": "Missing or invalid 'node_type' or 'properties'. 'properties' must be a dictionary."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+    # if not node_type or not id:
+    #     return Response(
+    #         {"error": "Missing or invalid 'node_type' or 'id'."},
+    #         status=status.HTTP_400_BAD_REQUEST,
+    #     )
 
     # Construct the Cypher query dynamically based on provided properties
     match_conditions = []
     parameters = {}
-    for key, value in properties.items():
-        # Use backticks around property names to handle spaces or special characters
-        match_conditions.append(f"n.`{key}` = $`{key}`")
-        parameters[key] = value
+
 
     # Base Cypher query to fetch distinct relationship types
     query = f"""
     MATCH (n:{node_type})-[r]-()
-    WHERE {' AND '.join(match_conditions)}
+    WHERE id(n) = {id}
     RETURN DISTINCT type(r) AS relationship_type
     """
 
-    # Debug: Print the final query and parameters
-    query_with_values = query
-    for key, value in parameters.items():
-        value_str = f"'{value}'" if isinstance(value, str) else str(value)
-        query_with_values = query_with_values.replace(f"${key}", value_str)
-    print("Final Cypher Query with Substituted Parameters:")
-    print(query_with_values)
+
 
     try:
         # Execute the query using the Neo4j driver
@@ -681,26 +674,22 @@ def get_node_relationships(request):
     # Get data from the request body
     print(request.data)
     node_type = request.data.get('node_type')
-    properties = request.data.get('properties', {})
+    id = request.data.get('id',12)
     relation_type = request.data.get('relation_type')  # Optional: Filter by specific relation type
 
-    if not node_type or not isinstance(properties, dict):
-        return Response(
-            {"error": "Missing or invalid 'node_type' or 'properties'. 'properties' must be a dictionary."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+    # if not node_type or not id:
+    #     return Response(
+    #         {"error": "Missing or invalid 'node_type' or 'id'."},
+    #         status=status.HTTP_400_BAD_REQUEST,
+    #     )
 
     # Construct the Cypher query dynamically based on provided properties
-    match_conditions = []
     parameters = {}
-    for key, value in properties.items():
-        match_conditions.append(f"n.`{key}` = $`{key}`")
-        parameters[key] = value
-
+   
     # Base Cypher query with relationships
     query = f"""
     MATCH (n:{node_type})-[r]-(related)
-    WHERE {' AND '.join(match_conditions)}
+    WHERE  id(n)={id}
     """
 
     # Add condition to filter by specific relationship type if provided
@@ -713,7 +702,7 @@ def get_node_relationships(request):
     RETURN n, r, related
     LIMIT 100
     """
-
+    print("qhqksjh",query)
     try:
         # Use the transformer-based parser to get graph data
         graph_data = parse_to_graph_with_transformer(query, parameters)
