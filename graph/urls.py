@@ -23,7 +23,6 @@ urlpatterns = [
     path('getdata/', views.getdata, name='getdata'),
     path('getrelationData/', views.getrelationData, name='getrelationData'),
     path('get_possible_relations/', views.get_possible_relations, name='get_possible_relations'),
-    path('getPersonneCrimes/', views.getPersonneCrimes, name='getPersonneCrimes'),
     path('node-types/', views.get_node_types, name='get_node_types'),
     path('node-types/properties/', views.get_node_properties, name='get_node_properties'),
     path('search-nodes/', views.search_nodes, name='search_nodes'),

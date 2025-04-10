@@ -8,8 +8,61 @@ from datetime import datetime
 import uuid
 from .utility import fetch_node_types, fetch_node_properties,driver
 from django.conf import settings
-
-
+import neo4j
+def parse_to_graph_with_transformer(query, params=None, database=None):
+    """
+    Execute a Neo4j query and parse the result into a graph structure using neo4j.Result.graph.
+    
+    Args:
+        query (str): The Cypher query to execute.
+        params (dict, optional): Parameters for the query.
+        database (str, optional): The Neo4j database to use.
+    
+    Returns:
+        dict: A dictionary with 'nodes' and 'edges' representing the graph.
+    """
+    try:
+        # Execute the query with the graph result transformer
+        graph_result = driver.execute_query(
+            query,
+            params or {},
+            database_=database or settings.NEO4J_DATABASE,
+            result_transformer_=neo4j.Result.graph
+        )
+        
+        # Initialize lists for nodes and edges
+        nodes = {}
+        edges = {}
+        
+        # Process nodes from the graph result
+        for node in graph_result.nodes:
+            labels = list(node.labels)  # Convert frozenset to list
+            node_type = labels[0] if labels else "Unknown"  # Use first label or fallback
+            nodes[node.id] = {
+                "id": node.id,
+                "nodeType": node_type,
+                "properties": dict(node)
+            }
+        
+        # Process relationships from the graph result
+        for rel in graph_result.relationships:
+            edges[rel.id] = {
+                "id": rel.id,
+                "type": rel.type,
+                "startNode": rel.start_node.id,
+                "endNode": rel.end_node.id,
+                "properties": dict(rel)
+            }
+        
+        # Convert to lists for JSON response
+        graph_data = {
+            "nodes": list(nodes.values()),
+            "edges": list(edges.values())
+        }
+        return graph_data
+    
+    except Exception as e:
+        raise Exception(f"Error parsing query result to graph: {str(e)}")
 def run_query(query, params=None):
     print("NEO4J_DATABASE !m!" ,settings.NEO4J_DATABASE)
     with driver.session(database=settings.NEO4J_DATABASE) as session:
@@ -433,87 +486,40 @@ def search_nodes(request):
                 parameters[key] = value
             elif operation == 'contains':
                 match_conditions.append(f"n.{key} CONTAINS ${key}")
-                parameters[key] = str(value)  # Ensure value is a string for CONTAINS
+                parameters[key] = str(value)
             elif operation == 'startswith':
                 match_conditions.append(f"n.{key} STARTS WITH ${key}")
-                parameters[key] = str(value)  # Ensure value is a string
+                parameters[key] = str(value)
             elif operation == 'endswith':
                 match_conditions.append(f"n.{key} ENDS WITH ${key}")
-                parameters[key] = str(value)  # Ensure value is a string
+                parameters[key] = str(value)
             else:
                 return Response(
                     {"error": f"Unsupported operation '{operation}' for property '{key}'"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        # Construct the query
         if not match_conditions:
-            query = f"MATCH (n:{node_type}) RETURN n, id(n) AS node_id"
+            query = f"MATCH (n:{node_type}) RETURN n"
         else:
             query = f"""
             MATCH (n:{node_type})
             WHERE {' AND '.join(match_conditions)}
-            RETURN n, id(n) AS node_id
+            RETURN n
             """
 
         # Debugging logs
         print("Generated Cypher Query:", query)
         print("Parameters:", parameters)
 
-        with driver.session() as session:
-            result = session.run(query, parameters)
-            nodes = [{'properties': record['n'], 'id': record['node_id']} for record in result]  # Extract nodes and IDs
-
-        formatted_nodes = []
-        for node in nodes:
-            # Exclude 'elementId' from properties and set 'identity' to the Neo4j ID
-            filtered_node = {key: value for key, value in dict(node['properties']).items() if key not in ['elementId']}
-            filtered_node['identity'] = node['id']  # Map Neo4j ID to 'identity'
-            formatted_nodes.append(filtered_node)
-
-        return Response(
-            {"node_type": node_type, "results": formatted_nodes},
-            status=status.HTTP_200_OK,
-        )
+        # Use the graph parser instead of manual processing
+        graph_data = parse_to_graph_with_transformer(query, parameters)
+        print(graph_data)
+        return Response(graph_data, status=status.HTTP_200_OK)
+    
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['POST'])
-def getPersonneCrimes(request):
-    if request.method == 'POST':
-        try:
-            # Extract node IDs from the request body
-            data = request.data
-            node_ids = data.get('nodeIds', [])  # Expecting a list of node IDs
-            print(node_ids)
-            if not node_ids:
-                return JsonResponse({'error': 'No node IDs provided'}, status=400)
-
-            # Query to count crimes for each "Personne" node
-            query = """
-            MATCH (p:Personne)-[:Impliquer]-(c:Affaire)
-            WHERE p.identity IN $nodeIds
-            RETURN p.identity AS nodeId, COUNT(c) AS crimeCount
-            """
-            params = {'nodeIds': node_ids}
-
-            # Execute the query
-            results = run_query(query, params)
-
-            # Format the results into a dictionary {nodeId: crimeCount}
-            crime_counts = {result['nodeId']: result['crimeCount'] for result in results}
-
-            # Include nodes with 0 crimes (if needed)
-            for node_id in node_ids:
-                if node_id not in crime_counts:
-                    crime_counts[node_id] = 0
-
-            return JsonResponse(crime_counts, status=200)
-
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-    else:
-        return JsonResponse({'error': 'Invalid request method'}, status=405)
-
 
 @api_view(['POST'])
 def get_possible_relations(request):
@@ -562,22 +568,6 @@ def get_possible_relations(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-from neo4j import GraphDatabase
-
-# Assuming you have your Neo4j driver initialized somewhere
-# driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-from neo4j import GraphDatabase
-
-# Assuming driver is initialized
-# driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
-
 
 
 @api_view(['POST'])
@@ -591,7 +581,7 @@ def personne_criminal_network(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Updated Cypher query using apoc.path.expandConfig
+    # Simplified Cypher query to return paths, letting the transformer handle the rest
     query = """
     MATCH (context:Personne {identity: $identity})
     CALL apoc.path.expandConfig(context, {
@@ -601,28 +591,21 @@ def personne_criminal_network(request):
     })
     YIELD path
     WHERE last(nodes(path)):Affaire
-    WITH collect(nodes(path)) AS all_node_lists, collect(relationships(path)) AS all_rel_lists
-    WITH apoc.coll.flatten(all_node_lists) AS all_nodes, apoc.coll.flatten(all_rel_lists) AS all_rels
-    WITH apoc.coll.toSet(all_nodes) AS unique_nodes, apoc.coll.toSet(all_rels) AS unique_rels
-    RETURN {
-      nodes: [n IN unique_nodes | {id: ID(n), labels: labels(n), properties: properties(n)}],
-      edges: [r IN unique_rels | {id: ID(r), type: type(r), startNode: ID(startNode(r)), endNode: ID(endNode(r)), properties: properties(r)}]
-    } AS result
+    RETURN path
     """
     
     parameters = {'identity': properties['identity']}
     
     try:
-        with driver.session() as session:
-            result = session.run(query, parameters)
-            record = result.single()  # Single row with all unique nodes and edges
-            
-            if record:
-                network_data = record["result"]
-                return Response(network_data, status=status.HTTP_200_OK)
-            else:
-                return Response({"nodes": [], "edges": []}, status=status.HTTP_200_OK)
-                
+        # Use the graph parser to process the result
+        graph_data = parse_to_graph_with_transformer(query, parameters)
+        
+        # If no nodes are returned, return an empty graph
+        if not graph_data["nodes"]:
+            return Response({"nodes": [], "edges": []}, status=status.HTTP_200_OK)
+        
+        return Response(graph_data, status=status.HTTP_200_OK)
+    
     except Exception as e:
         return Response(
             {"error": f"Error executing query: {str(e)}"},
@@ -693,14 +676,13 @@ def personne_criminal_network_old(request):
             {"error": f"Error executing query: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )  
-
 @api_view(['POST'])
 def get_node_relationships(request):
     # Get data from the request body
     print(request.data)
     node_type = request.data.get('node_type')
     properties = request.data.get('properties', {})
-    relation_type = request.data.get('relation_type')  # New: Get the specific relation type
+    relation_type = request.data.get('relation_type')  # Optional: Filter by specific relation type
 
     if not node_type or not isinstance(properties, dict):
         return Response(
@@ -712,11 +694,10 @@ def get_node_relationships(request):
     match_conditions = []
     parameters = {}
     for key, value in properties.items():
-        # Use backticks around property names to handle spaces or special characters
         match_conditions.append(f"n.`{key}` = $`{key}`")
         parameters[key] = value
 
-    # Base Cypher query with relationships, returning Neo4j IDs
+    # Base Cypher query with relationships
     query = f"""
     MATCH (n:{node_type})-[r]-(related)
     WHERE {' AND '.join(match_conditions)}
@@ -727,55 +708,17 @@ def get_node_relationships(request):
         query += f" AND type(r) = $relation_type"
         parameters['relation_type'] = relation_type
 
-    # Complete the query, returning Neo4j IDs for nodes and relationships
+    # Complete the query
     query += """
-    RETURN n, id(n) AS node_id, related, id(related) AS related_id, r, id(r) AS rel_id, 
-           type(r) AS relationship, labels(related) AS related_labels
+    RETURN n, r, related
     LIMIT 100
     """
 
-    # Debug: Print the final query and parameters
-    query_with_values = query
-    for key, value in parameters.items():
-        value_str = f"'{value}'" if isinstance(value, str) else str(value)
-        query_with_values = query_with_values.replace(f"${key}", value_str)
-    print("Final Cypher Query with Substituted Parameters:")
-    print(query_with_values)
-
     try:
-        with driver.session() as session:
-            result = session.run(query, parameters)  # Execute the query with parameters
-            relationships = []
-            for record in result:
-                node = record["n"]
-                node_id = record["node_id"]  # Neo4j ID for the main node
-                related_node = record["related"]
-                related_id = record["related_id"]  # Neo4j ID for the related node
-                relationship = record["r"]
-                rel_id = record["rel_id"]  # Neo4j ID for the relationship
-                relationship_type = record["relationship"]
-                related_labels = record["related_labels"]  # List of labels for the related node
-
-                # Remove 'elementId' from both the main node and the related node
-                related_node_dict = {key: value for key, value in dict(related_node).items() if key not in ['elementId']}
-                relationship_dict = {key: value for key, value in dict(relationship).items() if key not in ['elementId']}
-
-                # Add Neo4j IDs to the dictionaries
-                related_node_dict['identity'] = related_id  # Map related node's ID to 'identity'
-                relationship_dict['identity'] = rel_id  # Map relationship's ID to 'identity'
-
-                relationships.append({
-                    "related": {
-                        "node_type": list(related_labels)[0],  # Use the first label as node_type
-                        "properties": related_node_dict  # Include Neo4j ID as 'identity'
-                    },
-                    "relationship": {
-                        "identity": rel_id,  # Use Neo4j relationship ID directly here
-                        "type": relationship_type,  # Relationship type
-                        "properties": relationship_dict  # Include Neo4j ID as 'identity'
-                    }
-                })
-
-            return Response(relationships, status=status.HTTP_200_OK)
+        # Use the transformer-based parser to get graph data
+        graph_data = parse_to_graph_with_transformer(query, parameters)
+        print(graph_data)
+        return Response(graph_data, status=status.HTTP_200_OK)
     except Exception as e:
+        print(e)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

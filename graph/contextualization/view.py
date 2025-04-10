@@ -68,7 +68,7 @@ def get_all_affaire_types(request):
 def filter_affaire_relations(request):
     try:
         # Extract parameters from the request
-        affaire_types = request.data.get('Affaire_type', [])  # Required
+        affaire_types = request.data.get('Affaire_type', [])  # Required list of types
         wiliaya_id = request.data.get('wilaya_id', None)
         daira_id = request.data.get('daira_id', None)
         commune_id = request.data.get('commune_id', None)
@@ -77,36 +77,36 @@ def filter_affaire_relations(request):
         node_types = request.data.get('selectedNodeTypes', [])  # Optional list of types
         depth = int(request.data.get('depth', 1))  # Default depth is 1
 
-        print("node types"  ,node_types)
+        print("Node types:", node_types)
         # Validate required parameters
         if not affaire_types:  # Check if the list is empty
             return JsonResponse({"error": "At least one Affaire_type is required."}, status=400)
-        
+
+        # Construct label filter for apoc.path.expandConfig
         label_filter = "-Affaire"  # Always exclude Affaire
         if node_types:  # If specific node types are provided, whitelist them
             label_filter = f"{'|'.join('+' + nt for nt in node_types)},-Affaire"
 
-        print("lable filters ", label_filter)
+        print("Label filter:", label_filter)
         # Base MATCH clause to get the starting crime node
         match_clause = """
         MATCH (crime:Affaire)
         WHERE crime.Type IN $affaire_types
         """
-        print("affaire_types" ,affaire_types )
 
-        # Add filters for optional parameters
-        if wiliaya_id:
+        # Add filters for optional parameters (using ID instead of identity)
+        if wiliaya_id is not None:
             match_clause += """
             MATCH (crime)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune)-[:appartient]-(d:Daira)-[:appartient]-(w:Wilaya)
-            WHERE w.identity = $wiliaya_id
+            WHERE ID(w) = $wiliaya_id
             """
-            if daira_id:
+            if daira_id is not None:
                 match_clause += """
-                AND d.identity = $daira_id
+                AND ID(d) = $daira_id
                 """
-                if commune_id:
+                if commune_id is not None:
                     match_clause += """
-                    AND c.identity = $commune_id
+                    AND ID(c) = $commune_id
                     """
 
         if start_date:
@@ -118,7 +118,7 @@ def filter_affaire_relations(request):
             AND date(substring(crime.date, 6, 4) + "-" + substring(crime.date, 3, 2) + "-" + substring(crime.date, 0, 2)) <= date($end_date)
             """
 
-        # Complete query with apoc.path.expandConfig
+        # Complete query with apoc.path.expandConfig using ID instead of identity
         query = f"""
         {match_clause}
         CALL apoc.path.expandConfig(crime, {{
@@ -127,30 +127,30 @@ def filter_affaire_relations(request):
             uniqueness: 'NODE_PATH',
             labelFilter: '{label_filter}'
         }}) YIELD path
-        WITH crime, 
+        WITH crime,
              [node IN nodes(path) | node] AS path_nodes,
              [rel IN relationships(path) | rel] AS path_rels
-        WITH crime,
-             path_nodes AS nodes,
-             path_rels AS relations
-        RETURN crime,
+        RETURN {{
+            id: ID(crime),
+            properties: properties(crime)
+        }} AS crime,
                COLLECT({{
-                   identity: id(nodes[-1]), 
-                   labels: labels(nodes[-1]), 
-                   properties: properties(nodes[-1])
+                   id: ID(path_nodes[-1]), 
+                   labels: labels(path_nodes[-1]), 
+                   properties: properties(path_nodes[-1])
                }}) AS collected_nodes,
                COLLECT({{
-                   identity: id(relations[-1]), 
-                   type: type(relations[-1]), 
-                   properties: properties(relations[-1]), 
-                   startId: id(startNode(relations[-1])), 
-                   endId: id(endNode(relations[-1]))
+                   id: ID(path_rels[-1]), 
+                   type: type(path_rels[-1]), 
+                   properties: properties(path_rels[-1]), 
+                   startId: ID(startNode(path_rels[-1])), 
+                   endId: ID(endNode(path_rels[-1]))
                }}) AS collected_relations
         """
 
         # Set query parameters
         params = {
-           "affaire_types": affaire_types,  # Changed to plural
+            "affaire_types": affaire_types,
             "wiliaya_id": wiliaya_id,
             "daira_id": daira_id,
             "commune_id": commune_id,
@@ -159,9 +159,10 @@ def filter_affaire_relations(request):
             "depth": depth
         }
 
-        print("parms form contextualiaaiton" , params)
+        print("Params:", params)
+        print("Query:", query)
         # Execute the query
-        print("start excution")
+        print("Start execution")
         results = run_query(query, params)
 
         # Format the results
@@ -174,41 +175,44 @@ def filter_affaire_relations(request):
             # Filter nodes based on selected node_types
             filtered_nodes = []
             filtered_node_ids = set()
-            
             for node in nodes:
                 node_labels = node["labels"]
                 if not node_types or any(label in node_types for label in node_labels):
                     node_type = next((label for label in node_labels if label in node_types), node_labels[0] if node_labels else "Unknown")
                     filtered_nodes.append({
                         "node_type": node_type,
+                        "id": str(node["id"]),  # Use Neo4j ID as string
                         "properties": node["properties"]
                     })
-                    filtered_node_ids.add(node["identity"])
+                    filtered_node_ids.add(node["id"])
+
+            # Include the crime node explicitly
+            filtered_nodes.append({
+                "node_type": "Affaire",
+                "id": str(crime["id"]),
+                "properties": crime["properties"]
+            })
+            filtered_node_ids.add(crime["id"])
 
             # Filter relations
             filtered_relations = [
                 rel for rel in relations
-                if (
-                    (rel["startId"] in filtered_node_ids and rel["endId"] in filtered_node_ids)
-                    or (rel["startId"] == crime["identity"] and rel["endId"] in filtered_node_ids)
-                    or (rel["endId"] == crime["identity"] and rel["startId"] in filtered_node_ids)
-                )
+                if rel["startId"] in filtered_node_ids and rel["endId"] in filtered_node_ids
             ]
 
             # Remove duplicate relations
             unique_relations = {}
             for rel in filtered_relations:
                 unique_relations[(rel["startId"], rel["endId"], rel["type"])] = rel
-            formatted_relations = list(unique_relations.values())
+            formatted_edges = list(unique_relations.values())
 
             # Ensure nodes are connected to the crime node
             connected_node_ids = set()
-            nodes_to_process = {crime["identity"]}
-
+            nodes_to_process = {crime["id"]}
             while nodes_to_process:
                 current_node_id = nodes_to_process.pop()
                 connected_node_ids.add(current_node_id)
-                for rel in formatted_relations:
+                for rel in formatted_edges:
                     if rel["startId"] == current_node_id and rel["endId"] not in connected_node_ids:
                         nodes_to_process.add(rel["endId"])
                     elif rel["endId"] == current_node_id and rel["startId"] not in connected_node_ids:
@@ -217,208 +221,225 @@ def filter_affaire_relations(request):
             # Final filtering
             final_nodes = [
                 node for node in filtered_nodes 
-                if node["properties"]["identity"] in connected_node_ids
+                if int(node["id"]) in connected_node_ids
             ]
-            final_relations = [
-                rel for rel in formatted_relations
+            final_edges = [
+                rel for rel in formatted_edges
                 if rel["startId"] in connected_node_ids and rel["endId"] in connected_node_ids
             ]
 
             # Add formatted result
             formatted_results.append({
-                "affaire": crime,
+                "affaire": {
+                    "id": str(crime["id"]),
+                    "properties": crime["properties"]
+                },
                 "nodes": final_nodes,
-                "relations": final_relations
+                "relations": final_edges  # Renamed from "relations" to "edges"
             })
 
-        # Sort by date
-        formatted_results.sort(key=lambda x: datetime.strptime(x["affaire"]["date"], "%d-%m-%Y"))
+        # Sort by date with error handling
+        def get_date_key(item):
+            try:
+                return datetime.strptime(item["affaire"]["properties"]["date"], "%d-%m-%Y")
+            except (KeyError, ValueError, TypeError):
+                return datetime.min  # Fallback for missing or invalid dates
 
-        print("END excution")
+        formatted_results.sort(key=get_date_key)
+
+        print("End execution")
+        print("Formatted results:", formatted_results)
         return JsonResponse({"results": formatted_results}, safe=False)
 
     except Exception as e:
         print(f"Error: {e}")
         return JsonResponse({"error": str(e)}, status=500)
-    
 
-@api_view(['POST'])
-def filter_affaire_relation_old(request):
-    try:
-        # Extract parameters from the request
-        affaire_type = request.data.get('Affaire_type')  # Required
-        wiliaya_id = request.data.get('wilaya_id', None)
-        daira_id = request.data.get('daira_id', None)
-        commune_id = request.data.get('commune_id', None)
-        start_date = request.data.get('startDate', None)
-        end_date = request.data.get('endDate', None)
-        node_types = request.data.get('selectedNodeTypes')  # Optional list of types (e.g., ['Personne', 'Affaire'])
-        depth = int(request.data.get('depth', 1))  # Default depth is 1
-        print(request.data)
-        # Validate required parameters
-        if not affaire_type:
-            return JsonResponse({"error": "Affaire_type is required."}, status=400)
+# @api_view(['POST'])
+# def filter_affaire_relation_old(request):
+#     try:
+#         # Extract parameters from the request
+#         affaire_type = request.data.get('Affaire_type')  # Required
+#         wiliaya_id = request.data.get('wilaya_id', None)
+#         daira_id = request.data.get('daira_id', None)
+#         commune_id = request.data.get('commune_id', None)
+#         start_date = request.data.get('startDate', None)
+#         end_date = request.data.get('endDate', None)
+#         node_types = request.data.get('selectedNodeTypes', [])  # Optional list of types
+#         depth = int(request.data.get('depth', 1))  # Default depth is 1
+#         print(request.data)
 
-        # Remove 'Affaire' from node_types if present, as it is implied by the match clause
-        if 'Affaire' in node_types:
-            node_types.remove('Affaire')
+#         # Validate required parameters
+#         if not affaire_type:
+#             return JsonResponse({"error": "Affaire_type is required."}, status=400)
 
-        # Base MATCH clause for crime relationships
-        match_clause = f"""
-        MATCH (crime:Affaire)-[r*..{depth}]-(n)
-        WHERE  crime.Type = $affaire_type 
-        """
-        # Add filters for optional parameters
-        if wiliaya_id:
-            match_clause += """
-            MATCH (crime:Affaire)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune)-[:appartient]-(d:Daira)-[:appartient]-(w:Wilaya)
-            WHERE w.identity = $wiliaya_id
-            """
-            if daira_id:
-                match_clause += """
-                AND d.identity = $daira_id
-                """
-                if commune_id:
-                    match_clause += """
-                    AND c.identity = $commune_id
-                    """
+#         # Remove 'Affaire' from node_types if present, as it is implied by the match clause
+#         if 'Affaire' in node_types:
+#             node_types.remove('Affaire')
 
-        if start_date:
-            match_clause += """
-            AND date(substring(crime.date, 6, 4) + "-" + substring(crime.date, 3, 2) + "-" + substring(crime.date, 0, 2)) >= date($start_date)
-            """
-        if end_date:
-            match_clause += """
-            AND date(substring(crime.date, 6, 4) + "-" + substring(crime.date, 3, 2) + "-" + substring(crime.date, 0, 2)) <= date($end_date)
-            """
+#         # Base MATCH clause for crime relationships
+#         match_clause = f"""
+#         MATCH (crime:Affaire)-[r*..{depth}]-(n)
+#         WHERE crime.Type = $affaire_type
+#         """
 
-        # Filter node types if specified
+#         # Add filters for optional parameters
+#         if wiliaya_id:
+#             match_clause += """
+#             MATCH (crime:Affaire)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune)-[:appartient]-(d:Daira)-[:appartient]-(w:Wilaya)
+#             WHERE ID(w) = $wiliaya_id
+#             """
+#             if daira_id:
+#                 match_clause += """
+#                 AND ID(d) = $daira_id
+#                 """
+#                 if commune_id:
+#                     match_clause += """
+#                     AND ID(c) = $commune_id
+#                     """
 
-        # Combine the full query
-        query = f"""
-        {match_clause}
-        WITH crime,
-            COLLECT( n) AS nodes,
-            COLLECT( labels(n)) AS node_labels,
-            COLLECT([rel IN r | {{
-                identity: rel.identity, 
-                type: type(rel), 
-                properties: properties(rel), 
-                startId: startNode(rel).identity, 
-                endId: endNode(rel).identity
-            }}]) AS relations
-            RETURN crime,
-                nodes,
-                relations,
-                node_labels
-        """
+#         if start_date:
+#             match_clause += """
+#             AND date(substring(crime.date, 6, 4) + "-" + substring(crime.date, 3, 2) + "-" + substring(crime.date, 0, 2)) >= date($start_date)
+#             """
+#         if end_date:
+#             match_clause += """
+#             AND date(substring(crime.date, 6, 4) + "-" + substring(crime.date, 3, 2) + "-" + substring(crime.date, 0, 2)) <= date($end_date)
+#             """
 
-        print(query)
-        # Set query parameters
-        params = {
-            "affaire_type": affaire_type,
-            "wiliaya_id": wiliaya_id,
-            "daira_id": daira_id,
-            "commune_id": commune_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        }
+#         # Combine the full query using ID instead of identity
+#         query = f"""
+#         {match_clause}
+#         WITH crime,
+#             COLLECT(n) AS nodes,
+#             COLLECT(labels(n)) AS node_labels,
+#             COLLECT([rel IN r | {{
+#                 id: ID(rel), 
+#                 type: type(rel), 
+#                 properties: properties(rel), 
+#                 startId: ID(startNode(rel)), 
+#                 endId: ID(endNode(rel))
+#             }}]) AS relations
+#         RETURN {{
+#             id: ID(crime),
+#             properties: properties(crime)
+#         }} AS crime,
+#             nodes,
+#             relations,
+#             node_labels
+#         """
 
-        # Execute the query
-        results = run_query(query, params)
+#         print(query)
+#         # Set query parameters
+#         params = {
+#             "affaire_type": affaire_type,
+#             "wiliaya_id": wiliaya_id,
+#             "daira_id": daira_id,
+#             "commune_id": commune_id,
+#             "start_date": start_date,
+#             "end_date": end_date,
+#         }
 
-        # Format the results
-        formatted_results = []
-        for record in results:
-            crime = record["crime"]
-            nodes = record["nodes"]
-            relations = record["relations"]
-            node_labels = record["node_labels"]
-            # Step 2: Filter nodes based on the selected node_types while preserving their labels
-            filtered_nodes = []
-            for node, labels in zip(nodes, node_labels):
-                if any(node_type in labels for node_type in node_types):
-                    filtered_nodes.append((node, labels))  # Store both node and labels together
-            formatted_nodes = []
-            filtered_node_ids = set()  # Set to store filtered node identities
-            for node, labels in filtered_nodes:
-                node_type = "Unknown"  # Default value if no matching type is found
-                for label in labels:
-                    if label in node_types:
-                        node_type = label  # Assign the first matching label
-                        break  # Exit loop once the label is found
-                formatted_nodes.append({
-                    "node_type": node_type,
-                    "properties": node
-                })
-                filtered_node_ids.add(node["identity"])
-            # Flatten the list of lists
-            flat_relations = [rel for sublist in relations for rel in sublist]
+#         # Execute the query
+#         results = run_query(query, params)
 
-            # Filter relations to include only those where both startId and endId are in filtered_node_ids
-            filtered_relations = [
-                rel for rel in flat_relations
-                if (
-                    (rel["startId"] in filtered_node_ids and rel["endId"] in filtered_node_ids)
-                    or (rel["startId"] == crime["identity"] and rel["endId"] in filtered_node_ids)
-                    or (rel["endId"] == crime["identity"] and rel["startId"] in filtered_node_ids)
-                )
-            ]
+#         # Format the results
+#         formatted_results = []
+#         for record in results:
+#             crime = record["crime"]
+#             nodes = record["nodes"]
+#             relations = record["relations"]
+#             node_labels = record["node_labels"]
 
-            # Remove duplicate relations
-            unique_relations = {}
-            for rel in filtered_relations:
-                unique_relations[(rel["startId"], rel["endId"], rel["type"])] = rel
+#             # Filter nodes based on selected node_types
+#             filtered_nodes = []
+#             for node, labels in zip(nodes, node_labels):
+#                 if not node_types or any(node_type in labels for node_type in node_types):
+#                     filtered_nodes.append((node, labels))  # Store node and labels together
 
-            formatted_relations = list(unique_relations.values())
+#             # Format nodes with their Neo4j ID
+#             formatted_nodes = []
+#             filtered_node_ids = set()  # Use Neo4j IDs instead of identity
+#             for node, labels in filtered_nodes:
+#                 node_type = "Unknown"
+#                 for label in labels:
+#                     if not node_types or label in node_types:
+#                         node_type = label
+#                         break
+#                 node_id = node.id  # Neo4j internal ID (neo4j.graph.Node object)
+#                 formatted_nodes.append({
+#                     "node_type": node_type,
+#                     "id": str(node_id),  # Convert to string for JSON
+#                     "properties": dict(node)  # Convert node properties to dict
+#                 })
+#                 filtered_node_ids.add(node_id)
 
-            # Extract unique node IDs from filtered relations
-            relation_node_ids = set()
-            for rel in formatted_relations:
-                relation_node_ids.add(rel["startId"])
-                relation_node_ids.add(rel["endId"])
+#             # Flatten and filter relations
+#             flat_relations = [rel for sublist in relations for rel in sublist]
+#             filtered_relations = [
+#                 rel for rel in flat_relations
+#                 if (
+#                     (rel["startId"] in filtered_node_ids and rel["endId"] in filtered_node_ids)
+#                     or (rel["startId"] == crime["id"] and rel["endId"] in filtered_node_ids)
+#                     or (rel["endId"] == crime["id"] and rel["startId"] in filtered_node_ids)
+#                 )
+#             ]
 
-            # Ensure nodes are connected to the crime node
-            connected_node_ids = set()
-            nodes_to_process = {crime["identity"]}  # Start from the crime node
+#             # Remove duplicate relations
+#             unique_relations = {}
+#             for rel in filtered_relations:
+#                 unique_relations[(rel["startId"], rel["endId"], rel["type"])] = rel
 
-            # Pour éliminer les sous-graphes qui n'ont pas de relation avec l'affaire
-            while nodes_to_process:
-                current_node_id = nodes_to_process.pop()
-                connected_node_ids.add(current_node_id)
-                # Add neighbors connected by relations
-                for rel in formatted_relations:
-                    if rel["startId"] == current_node_id and rel["endId"] not in connected_node_ids:
-                        nodes_to_process.add(rel["endId"])
-                    elif rel["endId"] == current_node_id and rel["startId"] not in connected_node_ids:
-                        nodes_to_process.add(rel["startId"])
+#             formatted_relations = list(unique_relations.values())
 
-            # Filter nodes to include only those connected to the crime node
-            filtered_formatted_nodes = [
-                node for node in formatted_nodes if node["properties"]["identity"] in connected_node_ids
-            ]
+#             # Extract unique node IDs from filtered relations
+#             relation_node_ids = set()
+#             for rel in formatted_relations:
+#                 relation_node_ids.add(rel["startId"])
+#                 relation_node_ids.add(rel["endId"])
 
-            # Filter relations to include only those where both startId and endId are in filtered_formatted_nodes
-            final_filtered_relations = [
-                rel for rel in formatted_relations
-                if rel["startId"] in connected_node_ids and rel["endId"] in connected_node_ids
-            ]
-            
-           
-            # Add the formatted crime with filtered nodes and relations
-            formatted_results.append({
-                "affaire": crime,
-                "nodes": filtered_formatted_nodes,
-                "relations": final_filtered_relations
-            })
-            formatted_results.sort(key=lambda x: datetime.strptime(x["affaire"]["date"], "%d-%m-%Y"))
+#             # Ensure nodes are connected to the crime node
+#             connected_node_ids = set()
+#             nodes_to_process = {crime["id"]}  # Use crime's Neo4j ID
 
-        # Return the response
-        return JsonResponse({"results": formatted_results}, safe=False)
+#             while nodes_to_process:
+#                 current_node_id = nodes_to_process.pop()
+#                 connected_node_ids.add(current_node_id)
+#                 for rel in formatted_relations:
+#                     if rel["startId"] == current_node_id and rel["endId"] not in connected_node_ids:
+#                         nodes_to_process.add(rel["endId"])
+#                     elif rel["endId"] == current_node_id and rel["startId"] not in connected_node_ids:
+#                         nodes_to_process.add(rel["startId"])
 
-    except Exception as e:
-        print(f"Error: {e}")
-        return JsonResponse({"error": str(e)}, status=500)
+#             # Filter nodes and relations based on connectivity
+#             filtered_formatted_nodes = [
+#                 node for node in formatted_nodes if int(node["id"]) in connected_node_ids
+#             ]
+#             final_filtered_relations = [
+#                 rel for rel in formatted_relations
+#                 if rel["startId"] in connected_node_ids and rel["endId"] in connected_node_ids
+#             ]
+
+#             # Add the formatted crime with filtered nodes and relations
+#             formatted_results.append({
+#                 "affaire": {
+#                     "id": str(crime["id"]),  # Use Neo4j ID as string
+#                     "properties": crime["properties"]
+#                 },
+#                 "nodes": filtered_formatted_nodes,
+#                 "relations": final_filtered_relations
+#             })
+
+#         # Sort by date
+#         formatted_results.sort(key=lambda x: datetime.strptime(x["affaire"]["properties"]["date"], "%d-%m-%Y"))
+#         print(formatted_results)
+
+#         # Return the response
+#         return JsonResponse({"results": formatted_results}, safe=False)
+
+#     except Exception as e:
+#         print(f"Error: {e}")
+#         return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(['GET'])
 def get_all_wilaya(request):

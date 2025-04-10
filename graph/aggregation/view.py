@@ -76,7 +76,7 @@ def aggregate(request):
     type = request.data.get("type","memeaffaire")
     if not id_nodes:
         return Response({"error": "id_nodes parameter is required"}, status=400)
-
+    print(id_nodes)
     query_parts = []
     params = {"id_nodes": id_nodes}
     alias_counter = {}  # Dictionary to track alias counts
@@ -116,7 +116,7 @@ def aggregate(request):
         else:
             intermediate_aliases = aliases[1:-1]
         if intermediate_aliases:  # Only add WHERE clause if there are intermediate nodes
-            where_clause = "WHERE " + " AND ".join([f"{alias}.identity IN $id_nodes" for alias in intermediate_aliases])
+            where_clause = "WHERE " + " AND ".join([f"id({alias}) IN $id_nodes" for alias in intermediate_aliases])
         else:
             where_clause = ""  # No intermediate nodes, so no WHERE clause
 
@@ -143,18 +143,18 @@ def aggregate(request):
             count
         WITH 
             CASE 
-                WHEN start_node.identity < end_node.identity 
-                THEN {{startId: start_node.identity, endId: end_node.identity, type:'{type}' , count: count}}
-                ELSE {{startId: end_node.identity, endId: start_node.identity, type: '{type}', count: count}}
+                WHEN id(start_node) < id(end_node) 
+                THEN {{startId: id(start_node), endId: id(end_node), type:'{type}' , count: count}}
+                ELSE {{startId: id(end_node), endId: id(start_node), type: '{type}', count: count}}
             END AS relationship,
             COLLECT(DISTINCT {{
-                identity: start_node.identity,
+                id: id(start_node),
                 type: labels(start_node)[0], 
                 properties: start_node_properties,  /* Node's own properties */
                 aggregated_properties: first_intermediate_properties  /* Aggregated properties from intermediate node */
             }}) +
             COLLECT(DISTINCT {{
-                identity: end_node.identity, 
+                id: id(end_node), 
                 type: labels(end_node)[0], 
                 properties: end_node_properties,  /* Node's own properties */
                 aggregated_properties: last_intermediate_properties  /* Aggregated properties from intermediate node */
@@ -182,7 +182,7 @@ def aggregate(request):
     UNWIND combined_nodes AS node
     RETURN 
         COLLECT(DISTINCT {
-            identity: node.identity,
+            id: node.id,
             type: node.type,
             properties: node.properties,  /* Individual node properties */
             aggregated_properties: node.aggregated_properties  /* Aggregated properties from related nodes */
@@ -193,7 +193,6 @@ def aggregate(request):
     try:
         # Run the query using the provided helper function
         results = run_query(combined_query, params)
-
         if results:
             data = results[0]
             nodes = data.get("nodes", [])
