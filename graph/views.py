@@ -87,7 +87,7 @@ def getdata(request):
         print("nn")
 
         # Execute the query using the Neo4j driver
-        with driver.session() as session:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
             results = session.run(query, {"identity": identity})
             records = list(results)  # Convert the result to a list of records
 
@@ -118,7 +118,7 @@ def recherche(request):
         )
     
     try:
-        with driver.session() as session:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
             # Step 1: Handle node full-text indexes
             index_count_query = """
             SHOW FULLTEXT INDEXES
@@ -347,7 +347,7 @@ def getrelationData(request):
             )
             print(query)
             
-            with driver.session() as session:
+            with driver.session(database=settings.NEO4J_DATABASE) as session:
                 results = session.run(query, {
                     "start_id": start_id,
                     "end_id": end_id
@@ -391,7 +391,7 @@ def getrelationData(request):
                 } as relation_data
             """
 
-            with driver.session() as session:
+            with driver.session(database=settings.NEO4J_DATABASE) as session:
                 results = session.run(query, {"identity": identity})
                 records = list(results)
 
@@ -559,7 +559,7 @@ def get_possible_relations(request):
 
     try:
         # Execute the query using the Neo4j driver
-        with driver.session() as session:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
             result = session.run(query, parameters)
             relationship_types = [record["relationship_type"] for record in result]
 
@@ -661,7 +661,7 @@ def personne_criminal_network_old(request):
     parameters = {'identity': properties['identity']}
     
     try:
-        with driver.session() as session:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
             result = session.run(query, parameters)
             record = result.single()  # Single row with all unique nodes and edges
             
