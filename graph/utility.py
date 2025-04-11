@@ -200,232 +200,317 @@ from neo4j import GraphDatabase
 from django.conf import settings
 
 
+# views.py
+import os
+import json
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from neo4j import GraphDatabase
+
+
 @api_view(['POST'])
 def import_file_to_neo4j_view(request):
     """
-    API endpoint to import a file into Neo4j.
+    API endpoint to import files into Neo4j.
     POST request body (form-data):
-    - file: The file to upload (CSV, JSON, or Cypher)
+    - nodes_file: Optional CSV file for nodes
+    - relationships_file: Optional CSV file for relationships
+    - json_file: Optional JSON file
+    - cypher_file: Optional Cypher file
     - file_type: Optional (csv, json, cypher) - if not provided, inferred from extension
     - config: Optional JSON string for APOC configuration (for CSV/JSON)
     - nodes: Optional JSON string of node mappings (for CSV)
     - relationships: Optional JSON string of relationship mappings (for CSV)
     """
-    # Check if a file is provided
-    if 'file' not in request.FILES:
+    print("Starting import_file_to_neo4j_view")
+    # Check if at least one file is provided
+    if not any(key in request.FILES for key in ['nodes_file', 'relationships_file', 'json_file', 'cypher_file']):
+        print("No file provided in request")
         return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-    uploaded_file = request.FILES['file']
-    file_name = uploaded_file.name
     file_type = request.data.get('file_type', '').lower()
-    
-    # Infer file type from extension if not provided
+    print(f"File type received: {file_type}")
+    uploaded_files = {
+        'nodes_file': request.FILES.get('nodes_file'),
+        'relationships_file': request.FILES.get('relationships_file'),
+        'json_file': request.FILES.get('json_file'),
+        'cypher_file': request.FILES.get('cypher_file'),
+    }
+    print(f"Uploaded files: {[(k, v.name if v else None) for k, v in uploaded_files.items()]}")
+
+    # Infer file type if not provided
     if not file_type:
-        file_extension = os.path.splitext(file_name)[1].lower()
-        if file_extension == '.csv':
+        print("Inferring file type")
+        if uploaded_files['nodes_file'] or uploaded_files['relationships_file']:
             file_type = 'csv'
-        elif file_extension == '.json':
+        elif uploaded_files['json_file']:
             file_type = 'json'
-        elif file_extension == '.cypher':
+        elif uploaded_files['cypher_file']:
             file_type = 'cypher'
         else:
-            return Response({"error": "Unsupported file type. Use .csv, .json, or .cypher"}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            print("No supported file type detected")
+            return Response({"error": "Unsupported file type. Use .csv, .json, or .cypher"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        print(f"Inferred file type: {file_type}")
 
     # Parse JSON configurations
     try:
-        nodes = json.loads(request.data.get('nodes', '[]'))
-        relationships = json.loads(request.data.get('relationships', '[]'))
+        nodes_config_input = json.loads(request.data.get('nodes', '[]'))
+        relationships_config_input = json.loads(request.data.get('relationships', '[]'))
         config = json.loads(request.data.get('config', '{}'))
+        print("JSON configurations parsed successfully")
     except json.JSONDecodeError as e:
-        return Response({"error": f"Invalid JSON configuration: {str(e)}"}, 
-                      status=status.HTTP_400_BAD_REQUEST)
+        print(f"JSON decode error: {str(e)}")
+        return Response({"error": f"Invalid JSON configuration: {str(e)}"},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     try:
         # Get the import directory path from Neo4j
         with driver.session(database=settings.NEO4J_DATABASE) as session:
             result = session.run("CALL dbms.listConfig('server.directories.import') YIELD value RETURN value AS importDirectoryPath")
             import_dir = result.single()["importDirectoryPath"]
-            
-        # Save the file to the import directory
-        file_path = os.path.join(import_dir, file_name)
-        
-        try:
-            with open(file_path, 'wb+') as destination:
-                for chunk in uploaded_file.chunks():
-                    destination.write(chunk)
-        except Exception as e:
-            return Response({"error": f"Failed to save file: {str(e)}"}, 
-                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(f"Neo4j import directory: {import_dir}")
 
-        # Process the file based on type
+        saved_files = []
+        nodes_created = 0
+        relationships_created = 0
+        properties_set = 0
+
+        # Process based on file type
         with driver.session(database=settings.NEO4J_DATABASE) as session:
             if file_type == 'csv':
-                # Prepare nodes configuration
+                print("Processing CSV file type")
                 nodes_config = []
-                for node in nodes:
-                    node_config = {
-                        "fileName": f"file:///{file_name}",
-                        "labels": node.get("labels", []),
-                        "mapping": node.get("mapping", {})
-                    }
-                    if "header" in node:
-                        node_config["header"] = node["header"]
-                    nodes_config.append(node_config)
-
-                # Prepare relationships configuration
                 relationships_config = []
-                for rel in relationships:
-                    rel_config = {
-                        "fileName": f"file:///{file_name}",
-                        "type": rel.get("type", ""),
-                        "mapping": rel.get("mapping", {})
-                    }
-                    if "header" in rel:
-                        rel_config["header"] = rel["header"]
-                    relationships_config.append(rel_config)
 
-                # Execute APOC import
-                query = """
-                CALL apoc.import.csv($nodes, $relationships, $config)
-                """
-                result = session.run(query, {
-                    "nodes": nodes_config,
-                    "relationships": relationships_config,
-                    "config": config
-                })
-                summary = result.consume()
+                # Save nodes file if provided
+                if uploaded_files['nodes_file']:
+                    nodes_file = uploaded_files['nodes_file']
+                    nodes_file_path = os.path.join(import_dir, nodes_file.name)
+                    print(f"Saving nodes file to: {nodes_file_path}")
+                    try:
+                        with open(nodes_file_path, 'wb+') as destination:
+                            for chunk in nodes_file.chunks():
+                                destination.write(chunk)
+                        saved_files.append(nodes_file_path)
+                        print(f"Nodes file saved: {nodes_file_path}")
+                    except Exception as e:
+                        print(f"Error saving nodes file: {str(e)}")
+                        return Response({"error": f"Failed to save nodes file: {str(e)}"},
+                                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                    # Prepare nodes configuration
+                    for node in nodes_config_input:
+                        node_config = {
+                            "fileName": f"file:///{nodes_file.name}",
+                            "labels": node.get("labels", []),
+                            "mapping": node.get("mapping", {})
+                        }
+                        if "header" in node:
+                            node_config["header"] = node["header"]
+                        nodes_config.append(node_config)
+                    print(f"Nodes configuration: {nodes_config}")
+
+                # Save relationships file if provided
+                if uploaded_files['relationships_file']:
+                    rels_file = uploaded_files['relationships_file']
+                    rels_file_path = os.path.join(import_dir, rels_file.name)
+                    print(f"Saving relationships file to: {rels_file_path}")
+                    try:
+                        with open(rels_file_path, 'wb+') as destination:
+                            for chunk in rels_file.chunks():
+                                destination.write(chunk)
+                        saved_files.append(rels_file_path)
+                        print(f"Relationships file saved: {rels_file_path}")
+                    except Exception as e:
+                        print(f"Error saving relationships file: {str(e)}")
+                        return Response({"error": f"Failed to save relationships file: {str(e)}"},
+                                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                    # Prepare relationships configuration
+                    for rel in relationships_config_input:
+                        rel_config = {
+                            "fileName": f"file:///{rels_file.name}",
+                            "type": rel.get("type", ""),
+                            "mapping": rel.get("mapping", {})
+                        }
+                        if "header" in rel:
+                            rel_config["header"] = rel["header"]
+                        relationships_config.append(rel_config)
+                    print(f"Relationships configuration: {relationships_config}")
+
+                # Execute APOC import if either nodes or relationships are provided
+                if nodes_config or relationships_config:
+                    query = """
+                    CALL apoc.import.csv($nodes, $relationships, $config)
+                    """
+                    print(f"Executing APOC CSV import query: {query}")
+                    result = session.run(query, {
+                        "nodes": nodes_config,
+                        "relationships": relationships_config,
+                        "config": config
+                    })
+                    summary = result.consume()
+                    nodes_created = summary.counters.nodes_created
+                    relationships_created = summary.counters.relationships_created
+                    properties_set = summary.counters.properties_set
+                    print(f"CSV import results: nodes_created={nodes_created}, relationships_created={relationships_created}, properties_set={properties_set}")
+
                 return Response({
                     "message": "CSV imported successfully",
-                    "nodes_created": summary.counters.nodes_created,
-                    "relationships_created": summary.counters.relationships_created,
-                    "properties_set": summary.counters.properties_set
+                    "nodes_created": nodes_created,
+                    "relationships_created": relationships_created,
+                    "properties_set": properties_set
                 }, status=status.HTTP_200_OK)
 
             elif file_type == 'json':
-                # First, read the file to detect labels and prepare queries
-                with open(file_path, 'r') as json_file:
-                    lines = json_file.readlines()
-                    labels = set()
-                    node_queries = []
-                    relationship_queries = []
-                    
-                    for line in lines:
-                        try:
-                            data = json.loads(line)
-                            if data.get('type') == 'node' and 'labels' in data:
-                                # Collect labels for constraints
-                                for label in data['labels']:
-                                    labels.add(label)
-                                
-                                # Prepare MERGE query for the node
-                                properties = data.get('properties', {})
-                                if 'id' in properties:
-                                    # Use id as the unique identifier
-                                    node_id = properties['id']
-                                    del properties['id']  # Remove id from properties if you don't want to store it
-                                    
-                                    labels_str = ':'.join(data['labels'])
-                                    query = f"""
-                                    MERGE (n:{labels_str} {{neo4jImportId: $id}})
-                                    SET n += $properties
-                                    """
-                                    node_queries.append((query, {'id': node_id, 'properties': properties}))
-                                
-                            elif data.get('type') == 'relationship':
-                                # Prepare relationship query
-                                start_id = data.get('start', {}).get('id')
-                                end_id = data.get('end', {}).get('id')
-                                rel_type = data.get('label')
-                                properties = data.get('properties', {})
-                                
-                                if start_id and end_id and rel_type:
-                                    query = """
-                                    MATCH (a {neo4jImportId: $start_id}), (b {neo4jImportId: $end_id})
-                                    MERGE (a)-[r:%s]->(b)
-                                    SET r += $properties
-                                    """ % rel_type
-                                    relationship_queries.append((query, {
-                                        'start_id': start_id,
-                                        'end_id': end_id,
-                                        'properties': properties
-                                    }))
-                                    
-                        except json.JSONDecodeError:
-                            continue
-                
-                # Create constraints for each detected label
+                print("Processing JSON file type")
+                if not uploaded_files['json_file']:
+                    print("No JSON file provided in request")
+                    return Response({"error": "No JSON file provided"},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                json_file = uploaded_files['json_file']
+                json_file_path = os.path.join(import_dir, json_file.name)
+                print(f"Attempting to save JSON file to: {json_file_path}")
+                try:
+                    with open(json_file_path, 'wb+') as destination:
+                        print(f"Writing chunks for JSON file: {json_file.name}")
+                        for chunk in json_file.chunks():
+                            destination.write(chunk)
+                            print(f"Wrote chunk of size: {len(chunk)}")
+                    saved_files.append(json_file_path)
+                    print(f"JSON file saved successfully: {json_file_path}")
+                except Exception as e:
+                    print(f"Error saving JSON file: {str(e)}")
+                    return Response({"error": f"Failed to save JSON file: {str(e)}"},
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                # Verify file exists and is readable
+                if os.path.exists(json_file_path):
+                    print(f"Confirmed JSON file exists at: {json_file_path}")
+                    try:
+                        with open(json_file_path, 'r') as f:
+                            sample_content = f.read(1024)  # Read first 1KB
+                            print(f"Sample JSON file content: {sample_content[:100]}...")
+                    except Exception as e:
+                        print(f"Error reading JSON file: {str(e)}")
+                else:
+                    print(f"JSON file does not exist at: {json_file_path}")
+
+                # Extract labels for constraints
+                labels = set()
+                try:
+                    with open(json_file_path, 'r') as file_handle:  # Changed variable name to avoid overwriting json_file
+                        lines = file_handle.readlines()
+                        print(f"Read {len(lines)} lines from JSON file")
+                        for i, line in enumerate(lines):
+                            try:
+                                data = json.loads(line)
+                                print(f"Processing JSON line {i+1}: {line[:50]}...")
+                                if data.get('type') == 'node' and 'labels' in data:
+                                    for label in data['labels']:
+                                        labels.add(label)
+                            except json.JSONDecodeError as e:
+                                print(f"JSON decode error on line {i+1}: {str(e)}")
+                                continue
+                except Exception as e:
+                    print(f"Error reading JSON file for labels: {str(e)}")
+                    return Response({"error": f"Failed to read JSON file: {str(e)}"},
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                # Create constraints
+                print(f"Creating constraints for labels: {labels}")
                 for label in labels:
                     try:
                         constraint_query = f"""
                         CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.neo4jImportId IS UNIQUE
                         """
                         session.run(constraint_query)
+                        print(f"Constraint created for label: {label}")
                     except Exception as e:
+                        print(f"Error creating constraint for label {label}: {str(e)}")
                         return Response({
                             "error": f"Failed to create constraint for label {label}: {str(e)}"
                         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
-                # Execute node creation queries
-                nodes_created = 0
-                for query, params in node_queries:
-                    try:
-                        result = session.run(query, params)
-                        nodes_created += result.consume().counters.nodes_created
-                    except Exception as e:
-                        # Skip if node already exists
-                        if "already exists" in str(e):
-                            continue
-                        return Response({
-                            "error": f"Failed to create node: {str(e)}"
-                        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
-                # Execute relationship creation queries
-                relationships_created = 0
-                for query, params in relationship_queries:
-                    try:
-                        result = session.run(query, params)
-                        relationships_created += result.consume().counters.relationships_created
-                    except Exception as e:
-                        return Response({
-                            "error": f"Failed to create relationship: {str(e)}"
-                        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
+
+                # Execute APOC JSON import
+                documentation = f"CALL apoc.import.json('file://{json_file.name}')"
+                print(f"Executing APOC JSON import: {documentation}")
+                try:
+                    result = session.run(documentation)
+                    summary = result.consume()
+                    nodes_created = summary.counters.nodes_created
+                    relationships_created = summary.counters.relationships_created
+                    properties_set = summary.counters.properties_set
+                    print(f"JSON import results: nodes_created={nodes_created}, relationships_created={relationships_created}, properties_set={properties_set}")
+                except Exception as e:
+                    print(f"Error executing APOC JSON import: {str(e)}")
+                    return Response({
+                        "error": f"Failed to import JSON: {str(e)}"
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                print(f"JSON import completed: nodes_created={nodes_created}, relationships_created={relationships_created}")
                 return Response({
                     "message": "JSON imported successfully",
                     "nodes_created": nodes_created,
                     "relationships_created": relationships_created,
+                    "properties_set": properties_set,
                     "constraints_created": list(labels)
                 }, status=status.HTTP_200_OK)
 
             elif file_type == 'cypher':
-                # Handle Cypher file execution
-                with open(file_path, 'r') as cypher_file:
+                print("Processing Cypher file type")
+                if not uploaded_files['cypher_file']:
+                    print("No Cypher file provided")
+                    return Response({"error": "No Cypher file provided"},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                cypher_file = uploaded_files['cypher_file']
+                cypher_file_path = os.path.join(import_dir, cypher_file.name)
+                print(f"Saving Cypher file to: {cypher_file_path}")
+                try:
+                    with open(cypher_file_path, 'wb+') as destination:
+                        for chunk in cypher_file.chunks():
+                            destination.write(chunk)
+                    saved_files.append(cypher_file_path)
+                    print(f"Cypher file saved: {cypher_file_path}")
+                except Exception as e:
+                    print(f"Error saving Cypher file: {str(e)}")
+                    return Response({"error": f"Failed to save Cypher file: {str(e)}"},
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                # Execute Cypher queries
+                print("Executing Cypher queries")
+                with open(cypher_file_path, 'r') as cypher_file:
                     cypher_queries = cypher_file.read().split(';')
-                    for query in cypher_queries:
+                    for i, query in enumerate(cypher_queries):
                         query = query.strip()
                         if query:
+                            print(f"Executing Cypher query {i+1}: {query[:50]}...")
                             session.run(query)
-                return Response({"message": "Cypher queries executed successfully"}, 
+                return Response({"message": "Cypher queries executed successfully"},
                                 status=status.HTTP_200_OK)
 
             else:
-                return Response({"error": "Invalid file type specified"}, 
-                              status=status.HTTP_400_BAD_REQUEST)
+                print(f"Invalid file type: {file_type}")
+                return Response({"error": "Invalid file type specified"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
     except Exception as e:
-        return Response({"error": f"Failed to import file: {str(e)}"}, 
-                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"Unexpected error during import: {str(e)}")
+        return Response({"error": f"Failed to import file: {str(e)}"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     finally:
-        # Clean up the temporary file
-        if 'file_path' in locals() and os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except:
-                pass
+        # Clean up saved files
+       
         if 'driver' in locals():
             driver.close()
+            print("Neo4j driver closed")
+
+
 # @api_view(['POST'])
 # def import_file_to_neo4j_view(request):
 #     """
