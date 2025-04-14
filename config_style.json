@@ -31,7 +31,7 @@
       "labelKey": "nom_arabe"
     },
     "Commune": {
-      "color": "#33FF57",
+      "color": "#ba8945",
       "size": 120,
       "icon": "/icon/commune.png",
       "labelKey": "nom_arabe"
@@ -45,7 +45,7 @@
     "Unite": {
       "color": "#3221b5",
       "size": 120,
-      "icon": "/icon/unite.png",
+      "icon": "/icon/Unite.png",
       "labelKey": "nom_arabe"
     },
     "Affaire": {

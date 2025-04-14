@@ -11,14 +11,6 @@ def get_neo4j_driver():
 driver = get_neo4j_driver()
 
 def fetch_node_types():
-    """
-    Fetches all node types from the Neo4j database.
-    """
-    cache_key = "node_types_cache"
-    cached_data = cache.get(cache_key)
-    # if cached_data:
-    #     return cached_data
-
     query = """
     CALL db.labels() YIELD label
     RETURN label
@@ -31,7 +23,6 @@ def fetch_node_types():
             node_types = [{"type": record["label"]} for record in result]
             
             # Cache the result for 10 minutes (600 seconds)
-            cache.set(cache_key, node_types, timeout=600)
             return node_types
     finally:
         print("")
@@ -73,8 +64,6 @@ def fetch_node_properties(node_type):
             ]
     finally:
         print("")
-
-
 def run_query(query, params=None):
     print("NEO4J_DATABASE !!" ,settings.NEO4J_DATABASE)
     with driver.session(database = settings.NEO4J_DATABASE) as session:
