@@ -11,6 +11,7 @@ CONFIG_FILE = os.path.join(settings.BASE_DIR, 'config_style.json')
 @api_view(['GET'])
 def get_node_config(request):
     print("called me ")
+    print(request)
     try:
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             config = json.load(f)

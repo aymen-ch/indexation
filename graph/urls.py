@@ -24,6 +24,7 @@ urlpatterns = [
     ################################# details #################################
     path('getdata/', view_detail.getdata, name='getdata'),
     path('getrelationData/', view_detail.getrelationData, name='getrelationData'),
+    path('node-analysis/', view_detail.node_analysis, name='nodeanalysis'),
     ############################### contextmenu expand + actions ###################################
     path('get_possible_relations/', view_contextmenu.get_possible_relations, name='get_possible_relations'),
     path('get_node_relationships/', view_contextmenu.get_node_relationships, name='get_node_relationships'),

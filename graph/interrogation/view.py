@@ -10,7 +10,6 @@ import uuid
 from django.conf import settings
 import neo4j
 from graph.utility_neo4j import parse_to_graph_with_transformer, run_query
-
 def fetch_node_types():
     """
     Fetches all distinct node labels from the Neo4j database.
