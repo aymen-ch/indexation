@@ -28,7 +28,7 @@ def parse_to_graph_with_transformer(query, params=None, database=None):
         
         for rel in graph_result.relationships:
             edges[rel.id] = {
-                "id": rel.id,
+                "id": str(rel.id),
                 "type": rel.type,
                 "startNode": rel.start_node.id,
                 "endNode": rel.end_node.id,
