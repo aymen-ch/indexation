@@ -16,6 +16,9 @@ urlpatterns = [
     path('fetch_distinct_relations/', analyse_view.fetch_distinct_relations, name='fetch_distinct_relations'),
     path('Secteur_Activite/', analyse_view.Secteur_Activite, name='Secteur_Activite'),
     path('calculate_betweenness_centrality/', analyse_view.calculate_betweenness_centrality, name='calculate_betweenness_centrality'),
+    path('analyse_fetch_nodes_by_range/', analyse_view.analyse_fetch_nodes_by_range, name='analyse_fetch_nodes_by_range'),
+    path('expand_path_from_node/', analyse_view.expand_path_from_node, name='expand_path_from_node'),
+
     ############################### aggregation ###################################  
     path('agregate/', view_aggregation.aggregate, name='agregate_context'),
     path('aggregatehria/', view_aggregation.aggregate_hira, name='aggre_hira'),

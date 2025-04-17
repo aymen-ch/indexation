@@ -34,6 +34,9 @@ def parse_to_graph_with_transformer(query, params=None, database=None):
                 "endNode": rel.end_node.id,
                 "properties": dict(rel)
             }
+
+        print(f"Number of nodes: {len(graph_result.nodes)}")
+        print(f"Number of edges: {len(graph_result.relationships)}")
         
         return {
             "nodes": list(nodes.values()),
