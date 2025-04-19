@@ -32,13 +32,13 @@
     },
     "Commune": {
       "color": "#ba8945",
-      "size": 140,
+      "size": 120,
       "icon": "/icon/commune.png",
       "labelKey": "nom_arabe,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     },
     "Wilaya": {
       "color": "#a62bb6",
-      "size": 140,
+      "size": 120,
       "icon": "/icon/wilaya.png",
       "labelKey": "nom_arabe,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     },
@@ -46,7 +46,7 @@
       "color": "#3221b5",
       "size": 120,
       "icon": "/icon/Unite.png",
-      "labelKey": "nom_francais,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
+      "labelKey": "Type"
     },
     "Affaire": {
       "color": "#D20103",
@@ -70,7 +70,7 @@
       "color": "#3080e8",
       "size": 120,
       "icon": "/icon/Personne.png",
-      "labelKey": "رقم التعريف الوطني,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values,"
+      "labelKey": "رقم التعريف الوطني,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     },
     "default": {
       "color": "#CCCCCC",
