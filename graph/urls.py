@@ -29,6 +29,7 @@ urlpatterns = [
     path('get_possible_relations/', view_contextmenu.get_possible_relations, name='get_possible_relations'),
     path('get_node_relationships/', view_contextmenu.get_node_relationships, name='get_node_relationships'),
     path('personne_criminal_network/', view_contextmenu.personne_criminal_network, name='personne_criminal_network'),
+    path('get_virtual_relationships/', view_contextmenu.get_virtual_relationships, name='get_virtual_relationships'),
     #################################interrogation cible par type de node + rechreche #################################
     path('node-types/', view_intreogcible.get_node_types, name='get_node_types'),
     path('node-types/properties/', view_intreogcible.get_node_properties, name='get_node_properties'),
