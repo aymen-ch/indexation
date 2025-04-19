@@ -79,10 +79,10 @@
       "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     },
     "Account": {
-      "color": "#2aa26a",
-      "size": 120,
-      "icon": "/icon/profile.png",
-      "labelKey": "ccp,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
+      "color": "#754d4d",
+      "size": 90,
+      "icon": "/icon/Personne.png",
+      "labelKey": "ccp"
     }
   }
 }

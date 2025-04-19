@@ -12,6 +12,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from graph.utility import run_query  # Ensure this function runs Cypher queries
 
+from graph.utility_neo4j import parse_to_graph_with_transformer, run_query
+
 @api_view(['POST'])
 def fetch_distinct_relations(request):
     query = """
@@ -298,73 +300,97 @@ def calculate_betweenness_centrality(request):
 
 
 
-# @api_view(['POST'])
-# def calculate_degree_centrality(request):
-#     relationships = request.data
-#     if not relationships:
-#         return Response({"error": "No relationships provided."}, status=400)
-    
-#     nodes = set()
-#     edges = []
+@api_view(['POST'])
+def analyse_fetch_nodes_by_range(request):
+    # Extract parameters from the request
+    node_type = request.data.get('node_type')
+    attribute = request.data.get('attribute')
+    start = request.data.get('start')
+    end = request.data.get('end')
 
-#     if not isinstance(relationships, list):
-#         return Response({"error": "Invalid input format. Expected a list of relationships."}, status=400)
+    # Validate inputs
+    if not node_type or not attribute:
+        return Response({"error": "node_type and attribute are required."}, status=400)
+    if not isinstance(start, int) or not isinstance(end, int):
+        return Response({"error": "start and end must be integers."}, status=400)
+    if start < 0 or end < start:
+        return Response({"error": "Invalid range: start must be non-negative, and end must be >= start."}, status=400)
+
+    # Construct Cypher query to fetch, sort, and slice nodes
+    query = f"""
+    MATCH (n:{node_type})
+    WHERE n.{attribute} IS NOT NULL
+    RETURN n
+    ORDER BY n.{attribute} DESC
+    SKIP {start}
+    LIMIT {end - start + 1}
+    """
+
+    try:
+        # Execute the query using parse_to_graph_with_transformer
+        graph_result = parse_to_graph_with_transformer(query)
+
+        # Return the full graph result
+        return Response(graph_result, status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
     
-#     for rel in relationships:
-#         if not all(key in rel for key in ['from', 'to', 'label']):
-#             return Response({"error": "Invalid relationship format. Each relationship must include 'from', 'to', and 'label'."}, status=400)
+
+
+
+@api_view(['POST'])
+def expand_path_from_node(request):
+    """
+    Expands paths from a starting node with attribute filtering
+    Parameters (POST JSON body):
+    - id_start: The internal Neo4j ID of the starting node (required)
+    - attribute: The node attribute to filter on (default: '_betweenness')
+    - threshold: The minimum value for the attribute (default: 0.001)
+    - max_level: The maximum path expansion level (default: 10)
+    - relationship_type: The relationship type to follow (default: 'GROUPED_TRANSACTION')
+    """
+    try:
+        # Extract and validate parameters
+        params = request.data
+        id_start = params.get('id_start')
+        attribute = params.get('attribute', '_betweenness')
+        threshold = float(params.get('threshold', 0.001))
+        max_level = int(params.get('max_level', 10))
+        relationship_type = params.get('relationship_type', 'GROUPED_TRANSACTION')
+
+        # Validate required parameters
+        if id_start is None:
+            return Response({"error": "id_start is required"}, status=400)
         
-#         from_node, to_node, label = rel['from'], rel['to'], rel['label']
-#         nodes.add(from_node)
-#         nodes.add(to_node)
-#         edges.append({"start": from_node, "end": to_node, "type": label})
-    
-#     gds_graph_name = "tempSubgraph"
+        if not isinstance(id_start, int):
+            return Response({"error": "id_start must be an integer"}, status=400)
 
-#     try:
-#         create_nodes_query = """
-#         UNWIND $nodes AS node_id
-#         MERGE (n:TempNode {id: node_id})
-#         """
-#         create_edges_query = """
-#         UNWIND $edges AS edge
-#         MATCH (start:TempNode {id: edge.start}), (end:TempNode {id: edge.end})
-#         MERGE (start)-[r:TempRel {type: edge.type}]->(end)
-#         """
-#         create_gds_graph_query = f"""
-#         CALL gds.graph.project(
-#             '{gds_graph_name}',
-#             'TempNode',
-#             {{
-#                 TempRel: {{
-#                     orientation: 'Undirected'
-#                 }}
-#             }}
-#         )
-#         """
+        # Construct Cypher query
+        query = f"""
+        MATCH (start)
+        WHERE id(start) = {id_start}
+        
+        CALL apoc.path.expandConfig(start, {{
+            minLevel: 1,
+            maxLevel: {max_level},
+            uniqueness: "NODE_GLOBAL"
+        }}) YIELD path
+        
+        WHERE ALL(node IN nodes(path) WHERE node.{attribute} > {threshold})
+        UNWIND nodes(path) AS node
+        UNWIND relationships(path) AS rel
+        RETURN COLLECT(DISTINCT node) AS nodes, COLLECT(DISTINCT rel) AS relationships
+        """
 
-#         run_query(create_nodes_query, {"nodes": list(nodes)})
-#         run_query(create_edges_query, {"edges": edges})
-#         run_query(create_gds_graph_query, {})
+        # Execute query using your existing method
+        graph_result = parse_to_graph_with_transformer(query)
+        print ("graph_result",graph_result)
+        return Response({
+            "status": "success",
+            "data": graph_result
+        }, status=200)
 
-#         centrality_query = f"""
-#         CALL gds.eigenvector.stream('{gds_graph_name}')
-#         YIELD nodeId, score
-#         RETURN gds.util.asNode(nodeId).id AS node_id, score
-#         ORDER BY score DESC
-#         """
-#         centrality_results = run_query(centrality_query)
-
-#         cleanup_query = f"CALL gds.graph.drop('{gds_graph_name}') YIELD graphName"
-#         delete_temp_nodes = "MATCH (n:TempNode) DETACH DELETE n"
-#         run_query(cleanup_query)
-#         run_query(delete_temp_nodes)
-
-#         return Response({"degree_centrality": centrality_results}, status=200)
-    
-#     except Exception as e:
-#         cleanup_query = f"CALL gds.graph.drop('{gds_graph_name}') YIELD graphName"
-#         delete_temp_nodes = "MATCH (n:TempNode) DETACH DELETE n"
-#         run_query(cleanup_query)
-#         run_query(delete_temp_nodes)
-#         return Response({"error": str(e)}, status=500)
+    except ValueError as e:
+        return Response({"error": f"Invalid parameter value: {str(e)}"}, status=500)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
