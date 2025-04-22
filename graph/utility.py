@@ -85,13 +85,13 @@ def get_current_database_view(request):
     POST request (no body required).
     """
     print("NEO4J_DATABASE" ,settings.NEO4J_DATABASE)
-    driver = get_neo4j_driver()
+    # driver = get_neo4j_driver()
     try:
-        query = "CALL db.info() YIELD name RETURN name"
-        with driver.session(database=settings.NEO4J_DATABASE) as session:
-            result = session.run(query)
-            db_name = result.single()["name"]
-            return Response({"current_database": db_name}, status=status.HTTP_200_OK)
+        # query = "CALL db.info() YIELD name RETURN name"
+        # with driver.session(database=settings.NEO4J_DATABASE) as session:
+            # result = session.run(query)
+            # db_name = result.single()["name"]
+            return Response({"current_database": settings.NEO4J_DATABASE}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
