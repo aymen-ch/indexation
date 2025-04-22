@@ -78,6 +78,39 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 
+@api_view(['GET'])
+def get_database_stats_view(request):
+    """
+    API endpoint to get counts of nodes, relationships, labels, relationship types, and property keys.
+    GET request, no parameters required.
+    """
+    try:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
+            # Query for counts
+            queries = {
+                "nodes": "MATCH (n) RETURN COUNT(n) AS count",
+                "relationships": "MATCH ()-[r]->() RETURN COUNT(r) AS count",
+                "labels": "CALL db.labels() YIELD label RETURN COUNT(label) AS count",
+                "relationship_types": "CALL db.relationshipTypes() YIELD relationshipType RETURN COUNT(relationshipType) AS count",
+                "property_keys": "CALL db.propertyKeys() YIELD propertyKey RETURN COUNT(propertyKey) AS count",
+            }
+
+            stats = {}
+            for key, query in queries.items():
+                result = session.run(query)
+                stats[key] = result.single()["count"]
+
+            return Response({
+                "nodes": stats["nodes"],
+                "relationships": stats["relationships"],
+                "labels": stats["labels"],
+                "relationship_types": stats["relationship_types"],
+                "property_keys": stats["property_keys"],
+            }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['POST'])
 def get_current_database_view(request):
     """
@@ -127,6 +160,25 @@ def create_new_database_view(request):
         with driver.session(database="system") as session:
             session.run(query)
             return Response({"message": f"Database '{db_name}' created successfully"}, status=status.HTTP_201_CREATED)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+@api_view(['DELETE'])
+def delete_database_view(request):
+    """
+    API endpoint to delete a database.
+    DELETE request body: {"db_name": "your_database_name"}
+    """
+    db_name = request.data.get("db_name")
+    if not db_name:
+        return Response({"error": "db_name is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        query = f"DROP DATABASE {db_name}"
+        with driver.session(database="system") as session:
+            session.run(query)
+            return Response({"message": f"Database '{db_name}' deleted successfully"}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
@@ -380,7 +432,7 @@ def import_file_to_neo4j_view(request):
                 if os.path.exists(json_file_path):
                     print(f"Confirmed JSON file exists at: {json_file_path}")
                     try:
-                        with open(json_file_path, 'r') as f:
+                        with open(json_file_path, 'r',encoding='utf-8-sig') as f:
                             sample_content = f.read(1024)  # Read first 1KB
                             print(f"Sample JSON file content: {sample_content[:100]}...")
                     except Exception as e:
@@ -391,7 +443,7 @@ def import_file_to_neo4j_view(request):
                 # Extract labels for constraints
                 labels = set()
                 try:
-                    with open(json_file_path, 'r') as file_handle:  # Changed variable name to avoid overwriting json_file
+                    with open(json_file_path, 'r',encoding='utf-8-sig') as file_handle:  # Changed variable name to avoid overwriting json_file
                         lines = file_handle.readlines()
                         print(f"Read {len(lines)} lines from JSON file")
                         for i, line in enumerate(lines):
@@ -500,156 +552,3 @@ def import_file_to_neo4j_view(request):
             print("Neo4j driver closed")
 
 
-# @api_view(['POST'])
-# def import_file_to_neo4j_view(request):
-#     """
-#     API endpoint to import a file into Neo4j.
-#     POST request body (form-data):
-#     - file: The file to upload (CSV, JSON, or Cypher)
-#     - file_type: Optional (csv, json, cypher) - if not provided, inferred from extension
-#     - config: Optional JSON string for APOC configuration (for CSV/JSON)
-#     - nodes: Optional JSON string of node mappings (for CSV)
-#     - relationships: Optional JSON string of relationship mappings (for CSV)
-#     """
-#     # Check if a file is provided
-#     if 'file' not in request.FILES:
-#         return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
-
-#     uploaded_file = request.FILES['file']
-#     file_name = uploaded_file.name
-#     file_type = request.data.get('file_type', '').lower()
-    
-#     # Infer file type from extension if not provided
-#     if not file_type:
-#         file_extension = os.path.splitext(file_name)[1].lower()
-#         if file_extension == '.csv':
-#             file_type = 'csv'
-#         elif file_extension == '.json':
-#             file_type = 'json'
-#         elif file_extension == '.cypher':
-#             file_type = 'cypher'
-#         else:
-#             return Response({"error": "Unsupported file type. Use .csv, .json, or .cypher"}, 
-#                           status=status.HTTP_400_BAD_REQUEST)
-
-#     # Parse JSON configurations
-#     try:
-#         nodes = json.loads(request.data.get('nodes', '[]'))
-#         relationships = json.loads(request.data.get('relationships', '[]'))
-#         config = json.loads(request.data.get('config', '{}'))
-#     except json.JSONDecodeError as e:
-#         return Response({"error": f"Invalid JSON configuration: {str(e)}"}, 
-#                       status=status.HTTP_400_BAD_REQUEST)
-
-#     # # Initialize Neo4j driver
-#     # driver = GraphDatabase.driver(
-#     #     settings.NEO4J_URI,
-#     #     auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD)
-#     # )
-
-#     try:
-#         # Get the import directory path from Neo4j
-#         with driver.session(database=settings.NEO4J_DATABASE) as session:
-#             result = session.run("CALL dbms.listConfig('server.directories.import') YIELD value RETURN value AS importDirectoryPath")
-#             import_dir = result.single()["importDirectoryPath"]
-            
-#         # Save the file to the import directory
-#         file_path = os.path.join(import_dir, file_name)
-        
-#         try:
-#             with open(file_path, 'wb+') as destination:
-#                 for chunk in uploaded_file.chunks():
-#                     destination.write(chunk)
-#         except Exception as e:
-#             return Response({"error": f"Failed to save file: {str(e)}"}, 
-#                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-#         # Process the file based on type
-#         with driver.session(database=settings.NEO4J_DATABASE) as session:
-#             if file_type == 'csv':
-#                 # Prepare nodes configuration
-#                 nodes_config = []
-#                 for node in nodes:
-#                     node_config = {
-#                         "fileName": f"file:///{file_name}",
-#                         "labels": node.get("labels", []),
-#                         "mapping": node.get("mapping", {})
-#                     }
-#                     if "header" in node:
-#                         node_config["header"] = node["header"]
-#                     nodes_config.append(node_config)
-
-#                 # Prepare relationships configuration
-#                 relationships_config = []
-#                 for rel in relationships:
-#                     rel_config = {
-#                         "fileName": f"file:///{file_name}",
-#                         "type": rel.get("type", ""),
-#                         "mapping": rel.get("mapping", {})
-#                     }
-#                     if "header" in rel:
-#                         rel_config["header"] = rel["header"]
-#                     relationships_config.append(rel_config)
-
-#                 # Execute APOC import
-#                 query = """
-#                 CALL apoc.import.csv($nodes, $relationships, $config)
-#                 """
-#                 result = session.run(query, {
-#                     "nodes": nodes_config,
-#                     "relationships": relationships_config,
-#                     "config": config
-#                 })
-#                 summary = result.consume()
-#                 return Response({
-#                     "message": "CSV imported successfully",
-#                     "nodes_created": summary.counters.nodes_created,
-#                     "relationships_created": summary.counters.relationships_created,
-#                     "properties_set": summary.counters.properties_set
-#                 }, status=status.HTTP_200_OK)
-
-#             elif file_type == 'json':
-#                 # Handle JSON import with APOC
-#                 query = """
-#                 CALL apoc.import.json($file_url, $config)
-#                 """
-#                 result = session.run(query, {
-#                     "file_url": f"file:///{file_name}",
-#                     "config": config
-#                 })
-#                 summary = result.consume()
-#                 return Response({
-#                     "message": "JSON imported successfully",
-#                     "nodes_created": summary.counters.nodes_created,
-#                     "relationships_created": summary.counters.relationships_created,
-#                     "properties_set": summary.counters.properties_set
-#                 }, status=status.HTTP_200_OK)
-
-#             elif file_type == 'cypher':
-#                 # Handle Cypher file execution
-#                 with open(file_path, 'r') as cypher_file:
-#                     cypher_queries = cypher_file.read().split(';')
-#                     for query in cypher_queries:
-#                         query = query.strip()
-#                         if query:
-#                             session.run(query)
-#                 return Response({"message": "Cypher queries executed successfully"}, 
-#                                 status=status.HTTP_200_OK)
-
-#             else:
-#                 return Response({"error": "Invalid file type specified"}, 
-#                               status=status.HTTP_400_BAD_REQUEST)
-
-#     except Exception as e:
-#         return Response({"error": f"Failed to import file: {str(e)}"}, 
-#                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-#     finally:
-#         # Clean up the temporary file
-#         if 'file_path' in locals() and os.path.exists(file_path):
-#             try:
-#                 os.remove(file_path)
-#             except:
-#                 pass
-#         if 'driver' in locals():
-#             driver.close()

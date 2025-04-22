@@ -79,7 +79,7 @@
       "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     },
     "Account": {
-      "color": "#cc2e2e",
+      "color": "#f0e460",
       "size": 90,
       "icon": "/icon/Daira.png",
       "labelKey": "Type_de_Transaction"
