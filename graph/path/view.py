@@ -84,7 +84,7 @@ def get_all_connections4(request):
                     'source': rel['source'],
                     'target': rel['target'],
                     'type': rel['type'],
-                    'id': rel['id'],  # Include relationship properties,
+                    'id': str(rel['id']),  # Include relationship properties,
                     'properties':rel['properties']
                 }
                 for rel in record['relationships']

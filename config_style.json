@@ -83,6 +83,18 @@
       "size": 90,
       "icon": "/icon/Daira.png",
       "labelKey": "Type_de_Transaction"
+    },
+    "Movie": {
+      "color": "#972121",
+      "size": 90,
+      "icon": "/icon/default.png",
+      "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
+    },
+    "Person": {
+      "color": "#594ba0",
+      "size": 90,
+      "icon": "/icon/default.png",
+      "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     }
   }
 }

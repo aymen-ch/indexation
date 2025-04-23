@@ -140,7 +140,7 @@ def filter_affaire_relations(request):
                    properties: properties(path_nodes[-1])
                }}) AS collected_nodes,
                COLLECT({{
-                   id: ID(path_rels[-1]), 
+                   id: toString(ID(path_rels[-1])), 
                    type: type(path_rels[-1]), 
                    properties: properties(path_rels[-1]), 
                    startId: ID(startNode(path_rels[-1])), 
