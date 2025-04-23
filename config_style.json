@@ -25,7 +25,7 @@
   "captionTextShadow": "1px 1px 2px #000",
   "nodeTypes": {
     "Daira": {
-      "color": "#3d312f",
+      "color": "#49f41a",
       "size": 120,
       "icon": "/icon/daira.png",
       "labelKey": "nom_arabe,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
@@ -81,7 +81,6 @@
     "Account": {
       "color": "#f0e460",
       "size": 90,
-
       "icon": "/icon/Personne.png",
       "labelKey": "ccp"
     },
