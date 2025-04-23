@@ -79,7 +79,7 @@
       "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     },
     "Account": {
-      "color": "#f0e460",
+      "color": "#20a77f",
       "size": 90,
       "icon": "/icon/Personne.png",
       "labelKey": "ccp"
@@ -98,6 +98,12 @@
     },
     "Person": {
       "color": "#594ba0",
+      "size": 90,
+      "icon": "/icon/default.png",
+      "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
+    },
+    "GROUPED_TRANSACTION": {
+      "color": "#d35a5a",
       "size": 90,
       "icon": "/icon/default.png",
       "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"

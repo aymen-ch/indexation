@@ -10,6 +10,7 @@ from .sytle import view as style_view
 from .interrogation import view as view_intreogcible
 from .detail import view as view_detail
 from .contextmenu import view as view_contextmenu
+from .dashboard import view as view_dashboard
 urlpatterns = [
     ############################### Analysis ################################### 
     path('Node_clasification/', analyse_view.Node_clasification, name='Node_clasification'),
@@ -65,6 +66,14 @@ urlpatterns = [
     path('change_current_database/', change_current_database_view, name='change_current_database_view'),
     path('import_file_to_neo4j/', import_file_to_neo4j_view, name='import_file_to_neo4j_view'),
     path('database_stats/', get_database_stats_view, name='get_database_stats_view'),
+
+    ############################## DashBoard   ####################################
+    path('DashBoard_database_stats/', view_dashboard.get_database_stats_view, name='get_database_stats_view'),
+    path('DashBoard_get_node_type_counts/', view_dashboard.get_node_type_counts_view, name='get_node_type_counts_view'),
+    path('DashBoard_get_affaire_counts_by_wilaya/', view_dashboard.get_affaire_counts_by_wilaya_view, name='get_affaire_counts_by_wilaya_view'),
+    path('DashBoard_get_affaire_counts_by_day/', view_dashboard.get_affaire_counts_by_day_view, name='get_affaire_counts_by_day_view'),
+    path('DashBoard_get_top_unite_by_affaire_count/', view_dashboard.get_top_unite_by_affaire_count_view, name='get_top_unite_by_affaire_count_view'),
+    
 
     ############################## style config  ####################################
     path('node-config/', style_view.get_node_config, name='node-config'),
