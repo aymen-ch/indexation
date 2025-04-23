@@ -45,29 +45,36 @@ And the following Cypher query:
 and the error given by Neo4j:
 {error}
 
-Please return only the corrected Cypher query without any explanation.
+Please correct the query to avoid the error and return only the corrected Cypher query without any explanation  in this format
+
+<Query>
+   ....
+</Query>
+.
 """
     response = call_ollama(validation_prompt, model="hf.co/DavidLanz/text2cypher-gemma-2-9b-it-finetuned-2024v1:latest")
     return response.strip()
 @api_view(['POST'])
 def chatbot(request):
-
+    
     try:
         # Parse the request body
         data = json.loads(request.body)
         question = data.get('question')  # Extract the user's question
         answer_type = data.get('answer_type', 'Text')  # Default to 'Text' if not provided
-
+        modele = data.get('model')  # Default to 'Text' if not provide
+        
+        print(request.body)
         if not question:
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Generate the Cypher query using the LLM
         # formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
         prompt = simple_prompet(question=question,type=answer_type)
-        # cypher_response = call_ollama(prompt=prompt, model="tomasonjo/codestral-text2cypher:latest")
-        cypher_response="""
-MATCH (w:Wilaya)<-[:appartient]-(d:Daira)<-[:appartient]-(co:Commune)-[:situer]-(:Unite)-[:Traiter]->(a:Affaire) WITH w, COUNT(a) AS NumberOfCases ORDER BY NumberOfCases DESC LIMIT 1 RETURN NumberOfCases as  عدد_القضايا,w.nom_arabe as الولاية_الأكثر_تعرضا_للقضايا
-"""
+        cypher_response = call_ollama(prompt=prompt, model=modele)
+    #     cypher_response="""MATCH (a:Affaire)
+    #   WHERE a.date = "01-01-2023"
+    #   RETURN a"""
         # Extract the query between <Query> tags
         query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
         if query_match:
@@ -75,7 +82,7 @@ MATCH (w:Wilaya)<-[:appartient]-(d:Daira)<-[:appartient]-(co:Commune)-[:situer]-
         else:
             cypher_query = cypher_response  # Fallback if no tags are found
         # Replace specific terms in the Cypher query
-        cypher_query = cypher_query.replace("nationel_id", "`رقم التعريف الوطني`")
+        cypher_query = cypher_query.replace("national_id", "`رقم التعريف الوطني`")
         cypher_query = cypher_query.replace("birth_date", "`تاريخ الميلاد`")
         cypher_query = cypher_query.replace("firstname", "الاسم")
         cypher_query = cypher_query.replace("lastname", "اللقب")
@@ -88,25 +95,29 @@ MATCH (w:Wilaya)<-[:appartient]-(d:Daira)<-[:appartient]-(co:Commune)-[:situer]-
         if not success:
             # If the query execution fails, attempt to validate and correct it
             print(f"Query failed with error: {query_result}")
-            # corrected_query = validate_query(cypher_query, schema_description, query_result)
-            corrected_query=cypher_query
-            print("Corrected Cypher Query:", corrected_query)
+            corrected_query = validate_query(cypher_query, schema_description, query_result)
+            query_match = re.search(r'<Query>(.*?)</Query>', corrected_query, re.DOTALL)
+            if query_match:
+                cypher_query = query_match.group(1).strip()
+            else:
+                cypher_query = corrected_query  # Fallback if no tags are found
+
             
             # Re-execute the corrected query
-            query_result, success = execute_query_for_response_generation(corrected_query)
+            query_result, success = execute_query_for_response_generation(cypher_query)
             
             if not success:
                 # If the corrected query still fails, return the error
                 return Response(
                     {
-                        "cypher_query": corrected_query,
+                        "cypher": cypher_query,
                         "response": 'je ne peux pas répondre'  # Updated error message
                     },
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    status=status.HTTP_200_OK
                 )
             else:
                 # Update cypher_query to the corrected one for the response
-                cypher_query = corrected_query
+                cypher_query = cypher_query
 
         # Handle response based on answer type
         if answer_type == 'graph':
@@ -119,7 +130,7 @@ MATCH (w:Wilaya)<-[:appartient]-(d:Daira)<-[:appartient]-(co:Commune)-[:situer]-
             return Response(
                 {
                     "response": query_result,
-                    "cypher_query": cypher_query
+                    "cypher": cypher_query
                 },
                 status=status.HTTP_200_OK
             )
@@ -128,7 +139,7 @@ MATCH (w:Wilaya)<-[:appartient]-(d:Daira)<-[:appartient]-(co:Commune)-[:situer]-
             return Response(
                 {
                     "response": query_result,
-                    "cypher_query": cypher_query
+                    "cypher": cypher_query
                 },
                 status=status.HTTP_200_OK
             )
