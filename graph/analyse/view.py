@@ -14,6 +14,56 @@ from graph.utility import run_query  # Ensure this function runs Cypher queries
 
 from graph.utility_neo4j import parse_to_graph_with_transformer, run_query
 
+from ..utility   import driver
+
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.decorators import api_view
+from django.conf import settings
+
+@api_view(['GET'])
+def get_attribute_values_for_node_type(request):
+    """
+    API endpoint to get all values of a specific attribute for a given node type.
+    
+    Parameters:
+    - selectedGroup: The node type/label (e.g., 'Person', 'Movie')
+    - selectedCentralityAttribute: The attribute/property name (e.g., 'pagerank', 'betweenness')
+    
+    Returns:
+    - List of all values for the specified attribute in the specified node type
+    """
+    selected_group = request.query_params.get('selectedGroup')
+    selected_attribute = request.query_params.get('selectedCentralityAttribute')
+    
+    if not selected_group or not selected_attribute:
+        return Response(
+            {"error": "Both selectedGroup and selectedCentralityAttribute parameters are required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
+            # Query to get all values of the specified attribute for the node type
+            query = f"""
+            MATCH (n:{selected_group})
+            WHERE n.{selected_attribute} IS NOT NULL
+            RETURN n.{selected_attribute} AS attribute_value
+            """
+            
+            result = session.run(query)
+            attribute_values = [record["attribute_value"] for record in result]
+
+            return Response({
+                "node_type": selected_group,
+                "attribute": selected_attribute,
+                "values": attribute_values,
+                "count": len(attribute_values)
+            }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['POST'])
 def fetch_distinct_relations(request):
     query = """
