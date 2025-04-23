@@ -19,6 +19,7 @@ urlpatterns = [
     path('calculate_betweenness_centrality/', analyse_view.calculate_betweenness_centrality, name='calculate_betweenness_centrality'),
     path('analyse_fetch_nodes_by_range/', analyse_view.analyse_fetch_nodes_by_range, name='analyse_fetch_nodes_by_range'),
     path('expand_path_from_node/', analyse_view.expand_path_from_node, name='expand_path_from_node'),
+    path('get_attribute_values_for_node_type/', analyse_view.get_attribute_values_for_node_type, name='get_attribute_values_for_node_type'),
 
     ############################### aggregation ###################################  
     path('agregate/', view_aggregation.aggregate, name='agregate_context'),
