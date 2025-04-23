@@ -102,7 +102,7 @@ def get_all_connections4(request):
                             'source': rel['source'],
                             'target': rel['target'],
                             'type': rel['type'],
-                            'id': rel_id,
+                            'id': str( rel_id ),
                             'properties': rel['properties']
                         }
             
@@ -160,13 +160,13 @@ def shortestpath(request):
                     'source': rel['source'],
                     'target': rel['target'],
                     'type': rel['type'],
-                    'id': rel['id'],  # Include relationship properties,
+                    'id':str( rel['id'] ),  # Include relationship properties,
                     'properties':rel['properties']
                 }
                 for rel in record['relationships']
             ]
 
-                paths.append({
+            paths.append({
                     'nodes': nodes_in_path,
                     'relationships': relationships_in_path
                 })

@@ -56,7 +56,7 @@ urlpatterns = [
     ############################## path ####################################
     path('get_all_connections/', path_view.get_all_connections4, name='get_all_connections'),
     path('get_all_connections_subgraphe/', path_view.get_all_connections2, name='get_all_connections2'),
-      path('shortestpath/', path_view.shortestpath, name='shortestpath'),
+    path('shortestpath/', path_view.shortestpath, name='shortestpath'),
     ############################## Data Base Managment  ####################################
     path('list_all_databases/', list_all_databases_view, name='list_all_databases_view'),
     path('get_current_database/', get_current_database_view, name='get_current_database_view'),
