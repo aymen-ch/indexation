@@ -33,6 +33,10 @@ urlpatterns = [
     path('get_node_relationships/', view_contextmenu.get_node_relationships, name='get_node_relationships'),
     path('personne_criminal_network/', view_contextmenu.personne_criminal_network, name='personne_criminal_network'),
     path('get_virtual_relationships/', view_contextmenu.get_virtual_relationships, name='get_virtual_relationships'),
+    path('affaire_in_the_same_region/', view_contextmenu.affaire_in_the_same_region, name='affaire_in_the_same_region'),
+    path('get_available_actions/', view_contextmenu.get_available_actions, name='get_available_actions'),
+    path('execute_action/', view_contextmenu.execute_action, name='execute_action'),
+    path('add_action/', view_contextmenu.add_action, name='add_action'),
     #################################interrogation cible par type de node + rechreche #################################
     path('node-types/', view_intreogcible.get_node_types, name='get_node_types'),
     path('node-types/properties/', view_intreogcible.get_node_properties, name='get_node_properties'),
@@ -45,12 +49,14 @@ urlpatterns = [
     path('all_wilaya/', context_view.get_all_wilaya, name='all_wilaya'),
     path('dairas/', context_view.get_daira_by_wilaya, name='daira_by_wilaya'),
     path('communes/', context_view.get_commune_by_wilaya_and_daira, name='commune_by_wilaya_and_daira'),
+    path('count_affaires/', context_view.count_affaires, name='count_affaires'),
     #################################### chatbot ###############################   
     path('chatbot/', vchat.chatbot, name='chat'),
     path('run/', vchat.execute_query, name='execute_query'),
     ############################## path ####################################
     path('get_all_connections/', path_view.get_all_connections4, name='get_all_connections'),
     path('get_all_connections_subgraphe/', path_view.get_all_connections2, name='get_all_connections2'),
+      path('shortestpath/', path_view.shortestpath, name='shortestpath'),
     ############################## Data Base Managment  ####################################
     path('list_all_databases/', list_all_databases_view, name='list_all_databases_view'),
     path('get_current_database/', get_current_database_view, name='get_current_database_view'),

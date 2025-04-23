@@ -2,6 +2,8 @@ from langchain import LLMChain
 from langchain.prompts import FewShotPromptTemplate, PromptTemplate
 from .selector_exemple import *
 from .exemples import exemples
+from langchain_neo4j import Neo4jGraph
+
 few_shot_prompt = FewShotPromptTemplate(
     examples=exemples,
     example_prompt=example_prompt,
@@ -127,7 +129,7 @@ def call_ollama(prompt: str, model: str = "llama2") -> str:
     response = requests.post(ollama_url, json=payload)
     if response.status_code == 200:
         response_json = response.json()
-        # Extract the content from the response
+        # Extract the content from the response 
         if 'message' in response_json and 'content' in response_json['message']:
             return response_json['message']['content']
         else:

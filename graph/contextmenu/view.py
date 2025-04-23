@@ -1,6 +1,8 @@
 
 
 
+import json
+import os
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,7 +14,7 @@ import uuid
 from django.conf import settings
 import neo4j
 from graph.utility_neo4j import parse_to_graph_with_transformer,run_query
-
+CONFIG_FILE = os.path.join(settings.BASE_DIR, 'actions.json')
 @api_view(['POST'])
 def get_possible_relations(request):
     # Get data from the request body
@@ -57,20 +59,161 @@ def get_possible_relations(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 @api_view(['POST'])
-def personne_criminal_network(request):
-    # Get properties from request body
-    properties = request.data.get('properties', {})
-    
-    if not isinstance(properties, dict) or 'identity' not in properties:
+def get_available_actions(request):
+    # Get node type from request body
+    node_type = request.data.get('node_type', None)
+   
+    if not node_type:
         return Response(
-            {"error": "Missing or invalid 'properties'. Must include 'identity'"},
+            {"error": "Node type is required"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    try:
+        # Path to the actions configuration file
+        with open(CONFIG_FILE, 'r') as file:
+            actions_config = json.load(file)
+
+        # Filter actions by node type
+        available_actions = [
+            {"name": action["name"], "node_type": action["node_type"]}
+            for action in actions_config
+            if action["node_type"] == node_type
+        ]
+
+        return Response({"actions": available_actions}, status=status.HTTP_200_OK)
+
+    except FileNotFoundError:
+        print("Actions configuration file not found")
+        return Response(
+            {"error": "Actions configuration file not found"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    except Exception as e:
+        print(e)
+        return Response(
+            {"error": f"Error reading actions configuration: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+
+
+@api_view(['POST'])
+def add_action(request):
+    try:
+        # Validate required fields
+        required_fields = ['name', 'node_type', 'id_field', 'query']
+        for field in required_fields:
+            if field not in request.data:
+                return Response(
+                    {"error": f"Missing required field: {field}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        new_action = {
+            "name": request.data['name'],
+            "node_type": request.data['node_type'],
+            "id_field": request.data['id_field'],
+            "query": request.data['query']
+        }
+
+        # Load existing actions
+      
+        try:
+            with open(CONFIG_FILE, 'r') as file:
+                actions_config = json.load(file)
+        except FileNotFoundError:
+            actions_config = []
+
+        # Check for duplicate action name
+        if any(action['name'] == new_action['name'] for action in actions_config):
+            return Response(
+                {"error": f"Action '{new_action['name']}' already exists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Append new action
+        actions_config.append(new_action)
+
+        # Save updated config
+        with open(CONFIG_FILE, 'w') as file:
+            json.dump(actions_config, file, indent=2)
+
+        return Response(
+            {"message": f"Action '{new_action['name']}' added successfully"},
+            status=status.HTTP_201_CREATED
+        )
+    except Exception as e:
+        return Response(
+            {"error": f"Error adding action: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+@api_view(['POST'])
+def execute_action(request):
+    # Get action name and node ID from request body
+    action_name = request.data.get('action_name', None)
+    id = request.data.get('id', None)
+    print(request.data)
+    if not action_name or id is None:
+        return Response(
+            {"error": "Action name and node ID are required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Path to the actions configuration file
+
+        with open(CONFIG_FILE, 'r') as file:
+            actions_config = json.load(file)
+
+        # Find the action by name
+        action = next((action for action in actions_config if action["name"] == action_name), None)
+        if not action:
+            return Response(
+                {"error": f"Action '{action_name}' not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get the query and ID field
+        query = action["query"]
+        print(query)
+        id_field = action["id_field"]
+
+        # Prepare parameters
+        parameters = {'id': id}
+
+        # Execute the query using parse_to_graph_with_transformer
+        graph_data = parse_to_graph_with_transformer(query, parameters)
+        print(graph_data)
+        # If no nodes are returned, return an empty graph
+        if not graph_data["nodes"]:
+            return Response({"nodes": [], "edges": []}, status=status.HTTP_200_OK)
+
+        return Response(graph_data, status=status.HTTP_200_OK)
+
+    except FileNotFoundError:
+        return Response(
+            {"error": "Actions configuration file not found"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    except Exception as e:
+        print(e)
+        return Response(
+            {"error": f"Error executing action: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+@api_view(['POST'])
+def personne_criminal_network(request):
+    # Get properties from request body
+    id = request.data.get('id', None)
+    
+
     # Simplified Cypher query to return paths, letting the transformer handle the rest
     query = """
-    MATCH (context:Personne {identity: $identity})
+    MATCH (context:Personne {identity: $id})
     CALL apoc.path.expandConfig(context, {
       relationshipFilter: "Proprietaire|Appel_telephone|Impliquer",
       minLevel: 1,
@@ -81,7 +224,7 @@ def personne_criminal_network(request):
     RETURN path
     """
     
-    parameters = {'identity': properties['identity']}
+    parameters = {'identity': id}
     
     try:
         # Use the graph parser to process the result
@@ -93,6 +236,44 @@ def personne_criminal_network(request):
         
         return Response(graph_data, status=status.HTTP_200_OK)
     
+    except Exception as e:
+        return Response(
+            {"error": f"Error executing query: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+
+@api_view(['POST'])
+def affaire_in_the_same_region(request):
+    # Get properties from request body
+    id = request.data.get('id', None)
+    print(request.data)
+    if not id:
+        return Response(
+            {"error": "Affaire ID is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Cypher query to find all Affaire nodes in the same Wilaya
+    query = """
+    MATCH (context:Affaire)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune)-[:appartient]-(d:Daira)-[:appartient]-(w:Wilaya) WHERE id(context) = $id
+    MATCH (w)-[:appartient]-(d2:Daira)-[:appartient]-(c2:Commune)-[:situer]-(u2:Unite)-[:Traiter]-(other:Affaire)
+    RETURN other
+    """
+
+    parameters = {'id': id}
+
+    try:
+        # Assuming parse_to_graph_with_transformer executes the query and transforms results into a graph format
+        graph_data = parse_to_graph_with_transformer(query, parameters)
+
+        # If no nodes are returned, return an empty graph
+        if not graph_data["nodes"]:
+            return Response({"nodes": [], "edges": []}, status=status.HTTP_200_OK)
+
+        return Response(graph_data, status=status.HTTP_200_OK)
+
     except Exception as e:
         return Response(
             {"error": f"Error executing query: {str(e)}"},

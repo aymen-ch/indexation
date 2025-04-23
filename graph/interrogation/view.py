@@ -102,6 +102,7 @@ def search_nodes(request):
     try:
         node_type = request.data.get('node_type')
         search_payload = request.data.get('properties', {})
+        print(search_payload)
         if not node_type or not isinstance(search_payload, dict):
             return Response(
                 {"error": "Missing or invalid 'node_type' or 'properties'. 'properties' must be a dictionary."},
@@ -151,6 +152,7 @@ def search_nodes(request):
             WHERE {' AND '.join(match_conditions)}
             RETURN n
             """
+        print(query)
         graph_data = parse_to_graph_with_transformer(query, parameters)
         return Response(graph_data, status=status.HTTP_200_OK)
     except Exception as e:

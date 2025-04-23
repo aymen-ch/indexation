@@ -63,7 +63,58 @@ def get_all_affaire_types(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     
-
+@api_view(['POST'])
+def count_affaires(request):
+    try:
+        affaire_types = request.data.get('Affaire_type', [])
+        wilaya_id = request.data.get('wilaya_id', None)
+        daira_id = request.data.get('daira_id', None)
+        commune_id = request.data.get('commune_id', None)
+        start_date = request.data.get('startDate', None)
+        end_date = request.data.get('endDate', None)
+        if not affaire_types:
+            return JsonResponse({"error": "At least one Affaire_type is required."}, status=400)
+        match_clause = """
+        MATCH (crime:Affaire)
+        WHERE crime.Type IN $affaire_types
+        """
+        if wilaya_id is not None:
+            match_clause += """
+            MATCH (crime)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune)-[:appartient]-(d:Daira)-[:appartient]-(w:Wilaya)
+            WHERE ID(w) = $wilaya_id
+            """
+            if daira_id is not None:
+                match_clause += """
+                AND ID(d) = $daira_id
+                """
+                if commune_id is not None:
+                    match_clause += """
+                    AND ID(c) = $commune_id
+                    """
+        if start_date:
+            match_clause += """
+            AND date(substring(crime.date, 6, 4) + "-" + substring(crime.date, 3, 2) + "-" + substring(crime.date, 0, 2)) >= date($start_date)
+            """
+        if end_date:
+            match_clause += """
+            AND date(substring(crime.date, 6, 4) + "-" + substring(crime.date, 3, 2) + "-" + substring(crime.date, 0, 2)) <= date($end_date)
+            """
+        query = f"""
+        {match_clause}
+        RETURN count(crime) AS total_affaires
+        """
+        params = {
+            "affaire_types": affaire_types,
+            "wilaya_id": wilaya_id,
+            "daira_id": daira_id,
+            "commune_id": commune_id,
+            "start_date": start_date,
+            "end_date": end_date
+        }
+        result = run_query(query, params)
+        return JsonResponse({"total_affaires": result[0]["total_affaires"]}, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 @api_view(['POST'])
 def filter_affaire_relations(request):
     try:
