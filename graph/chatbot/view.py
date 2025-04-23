@@ -64,18 +64,22 @@ def chatbot(request):
         question = data.get('question')  # Extract the user's question
         answer_type = data.get('answer_type', 'Text')  # Default to 'Text' if not provided
         modele = data.get('model')  # Default to 'Text' if not provide
-        
+        selected_nodes = data.get('selected_nodes', '')
         print(request.body)
         if not question:
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Generate the Cypher query using the LLM
         # formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
-        prompt = simple_prompet(question=question,type=answer_type)
+        if selected_nodes:
+            print(selected_nodes)
+            # Use prompt with selected nodes if provided
+            prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
+        else:
+            # Use default prompt if no selected nodes
+            prompt = simple_prompet(question=question, type=answer_type)
         cypher_response = call_ollama(prompt=prompt, model=modele)
-    #     cypher_response="""MATCH (a:Affaire)
-    #   WHERE a.date = "01-01-2023"
-    #   RETURN a"""
+      
         # Extract the query between <Query> tags
         query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
         if query_match:
@@ -185,13 +189,14 @@ def chatbot_resume(request):
         prompt = simple_prompet_resume(context=raw_response, question=question, cypher_query=cypher_query) # Adjust based on how simple_prompet works
         resume_response = call_ollama(prompt=prompt, model=model)
         # Extract the content between <Resume> tags
+        print(resume_response)
         resume_match = re.search(r'<Resume>(.*?)</Resume>', resume_response, re.DOTALL)
         if resume_match:
             resumed_content = resume_match.group(1).strip()
         else:
             resumed_content = resume_response  # Fallback if no tags are found
 
-
+        
         # Return the resumed response
         response_data = {
             "response": resumed_content,

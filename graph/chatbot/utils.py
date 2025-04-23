@@ -319,33 +319,9 @@ graph_generation_prompt = PromptTemplate(
 )
 
 
-
-
 def simple_prompet_resume(context, question, cypher_query):
     prompt = f"""
 Using the provided context (result of the previous Cypher query), the original Arabic question, and the previous Cypher query, generate a resumed response for a Neo4j database.
-
-
-
-**Input:**
-- **Context**: The result of the previous Cypher query execution, containing the data returned by the query.
-- **Question**: The original Arabic question asked by the user.
-- **Cypher Query**: The previous Cypher query that was executed.
-
-**Rules:**
-1. Analyze the context, question, and previous Cypher query to generate a meaningful continuation of the response.
-2. Adhere strictly to the schema: only use defined node labels, properties, and relationship types.
-3. Use node aliases (e.g., `(p:Personne)`).
-4. **Do not add any explanation, notes, or additional text under any circumstances.**
-5. **Output only the resumed response** in the specified format.
-6. The resumed response should be a natural continuation or enhancement of the previous result, potentially refining the query or summarizing the context in a user-friendly way.
-
-**Output Requirements:**
-- Return **only the resumed response** in this exact format:
-  <Resume>
-    ...
-  </Resume>
-
 **Context:**
 <Context>
 {context}
@@ -361,6 +337,103 @@ Using the provided context (result of the previous Cypher query), the original A
 {cypher_query}
 </Cypher>
 
-**Do not add any explanation, notes, or additional text under any circumstances**, just return the resumed response in the specified format.
+**Rules:**
+1. Analyze the context, question, and previous Cypher query to generate a meaningful continuation of the response.
+2. **Output only the resumed response** in the specified format.
+3. The resumed response should be a natural continuation or enhancement of the previous result, potentially refining the query or summarizing the context in a user-friendly way.
+
+**Output Requirements:**
+- Return **only the resumed response** in this exact format:
+  <Resume>
+    ...
+  </Resume>
+
+**Example:**
+Given:
+- Question: ما هو رقم هاتف الشخص الذي لديه رقم التعريف الوطني 19454664525774
+- Cypher Query:
+  MATCH (p:Phone {{num: '0774033106'}})-[:Appel_telephone]-(calledPhone:Phone)
+  RETURN calledPhone.num AS أرقام_الهواتف_المنصل_بها
+- Context: {{'رقم_الهاتف': '0660838914'}}
+
+The resumed response should be:
+<Resume>
+  الرقم المرتبط برقم التعريف الوطني المطلوب هو 0660838914، ويمكن من خلاله الوصول إلى الأرقام التي تم الاتصال بها باستخدام الاستعلام المذكور.
+</Resume>
+"""
+    return prompt
+
+
+
+def simple_prompt_with_nodes(question, type, selected_nodes):
+    prompt = f"""
+You are a Neo4j expert tasked with converting Arabic questions into Cypher queries for a Neo4j database. The user has selected specific nodes and asks a question about them. Translate the Arabic question mentally into English to understand its intent and map it to the provided schema.
+
+**Database Schema:**
+<Schema>
+{schema_description}
+</Schema>
+
+**Selected Nodes:**
+<Nodes>
+{selected_nodes}
+</Nodes>
+- Format: `Label:ID` (e.g., `Personne:122`, `Affaire:223`).
+- Use these nodes as starting points or constraints in the query, matching them by their internal Neo4j ID using `id()` (e.g., `WHERE id(p) = 122`).
+
+**Input:**
+- The question is in Arabic, optionally prefixed with a response type (`type:table` or `type:graph`).
+- The selected nodes are provided and must be used in the query.
+
+**Rules:**
+1. Use node aliases (e.g., `(p:Personne)`).
+2. Adhere strictly to the schema: only use defined node labels, properties, and relationship types.
+3. Incorporate the selected nodes by matching them explicitly using `id()` for internal Neo4j IDs (e.g., `MATCH (p:Personne) WHERE id(p) = 122`).
+4. Analyze the question carefully to map nodes, relationships, and properties accurately.
+5. For shortest path queries, use `shortestPath()` with `[*]` to allow relationships in any direction, unless the question specifies a direction.
+6. **Do not add any explanation, notes, or additional text under any circumstances.**
+7. **Output only the Cypher query** in the specified format.
+
+**Response Type Handling:**
+1. **Table Response (`type:table` or default):**
+   - Return a tabular result with properties or aggregations.
+   - Always use meaningful Arabic aliases (e.g., `p.الاسم AS الاسم`, `COUNT(p) AS عدد_الأشخاص`).
+   - Example:
+     <Question>
+       ما هي خصائص الشخص والقضية المختارين؟
+     </Question>
+     <Type>table</Type>
+     <Nodes>Personne:122,Affaire:223</Nodes>
+     <Query>
+       MATCH (p:Personne), (a:Affaire)
+       WHERE id(p) = 122 AND id(a) = 223
+       RETURN p.`رقم التعريف الوطني` AS الرقم_الوطني, p.الاسم AS الاسم, p.اللقب AS اللقب, a.Number AS رقم_القضية
+     </Query>
+2. **Graph Response (`type:graph`):**
+   - Return the full path or relevant graph structure.
+   - For shortest path queries, use `shortestPath()` with a variable (e.g., `path = shortestPath(...)`) and return the path.
+   - Example:
+     <Question>
+       ما هو أقصر مسار بين الشخص والقضية؟
+     </Question>
+     <Type>graph</Type>
+     <Nodes>Personne:122,Affaire:223</Nodes>
+     <Query>
+       MATCH path = shortestPath((p:Personne)-[*]-(a:Affaire))
+       WHERE id(p) = 122 AND id(a) = 223
+       RETURN path
+     </Query>
+
+**Output Requirements:**
+- Return **only the Cypher query** in this exact format:
+  <Query>
+    ...
+  </Query>
+
+**Question:**
+<Question>
+{question}
+</Question>
+<Type>{type}</Type>
 """
     return prompt
