@@ -61,8 +61,8 @@
       "labelKey": "ID,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     },
     "Phone": {
-      "color": "#c8ae37",
-      "size": 120,
+      "color": "#dbc357",
+      "size": 112,
       "icon": "/icon/phone.png",
       "labelKey": "num"
     },
@@ -79,14 +79,17 @@
       "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
     },
     "Account": {
-      "color": "#754d4d",
+      "color": "#f0e460",
       "size": 90,
+
       "icon": "/icon/Personne.png",
       "labelKey": "ccp"
     },
     "NewType": {
       "size": 777,
-      "color": "#d91c1c"
+      "color": "#d91c1c",
+      "icon": "/icon/Daira.png",
+      "labelKey": "Type_de_Transaction"
     }
   }
 }

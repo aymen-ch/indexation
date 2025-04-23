@@ -4,6 +4,7 @@ from rest_framework.response import Response
 import neo4j 
 from graph.utility import run_query,driver
 
+from graph.utility_neo4j import parse_to_graph_with_transformer
 # //////////////  neeed to aggregate properties /////////
 
 
@@ -500,6 +501,11 @@ RETURN {
 
 
 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from django.http import JsonResponse
+
 @api_view(['POST'])
 def aggregate_with_algo(request):
     # Extract parameters from the request body
@@ -508,6 +514,7 @@ def aggregate_with_algo(request):
     patterns = request.data.get('patterns', [
         "-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-"
     ])  # Default pattern if not provided
+    rel_type = request.data.get('rel_type', 'CONNECTED')  # Default relationship type
 
     # Validate inputs
     if depth < 1:
@@ -518,23 +525,20 @@ def aggregate_with_algo(request):
     # Initialize the base query
     query = """
     UNWIND $id_affaires AS id_affaire
-    MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
+    MATCH (c:Affaire)-[r0:Impliquer]-(p1:Personne)
     WHERE c.identity = id_affaire
+    WITH id_affaire, c, p1, r0
     """
 
-    # Lists to collect nodes and relations
-    nodes = ["COLLECT(DISTINCT {identity: c.identity, type: 'Affaire'})", 
-             "COLLECT(DISTINCT {identity: p1.identity, type: 'Personne'})"]
-    relations = ["COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: 'Impliquer'})"]
+    # Lists to collect nodes and virtual relationships
+    nodes = ["c", "p1"]
+    vrels = ["r0"]  # Keep the original Impliquer relationship
 
     # Build the query dynamically for each depth level and pattern
     for i in range(1, depth):
         # For each depth level, match any of the provided patterns
         pattern_matches = []
         for pattern in patterns:
-            # Convert the pattern into a Cypher MATCH clause
-            # Assuming patterns are strings like "-[:Rel1]-(:Node)-[:Rel2]-"
-            # We'll construct something like: (p{i})<pattern>(p{i+1}:Personne)
             pattern_match = f"(p{i}){pattern}(p{i+1}:Personne)"
             pattern_matches.append(pattern_match)
 
@@ -543,32 +547,62 @@ def aggregate_with_algo(request):
         query += f"""
         {match_clause}
         WHERE id_affaire IN p{i+1}._affiresoutin AND p{i+1}._Lvl_of_Implications[{i}] > p{i}._Lvl_of_Implications[{i-1}]
+        CALL apoc.create.vRelationship(p{i}, $rel_type, {{depth: {i}, pattern: '{patterns[0]}'}}, p{i+1}) YIELD rel AS vrel{i}
+        WITH id_affaire, {', '.join(nodes)}, {', '.join(vrels)}, vrel{i}, p{i+1}
         """
-        nodes.append(f"COLLECT(DISTINCT {{identity: p{i+1}.identity, type: 'Personne'}})")
-        # For relations, dynamically infer the relation type from the pattern (simplified here)
-        relations.append(f"COLLECT(DISTINCT {{source: p{i}.identity, target: p{i+1}.identity, relation: 'PatternMatch'}})")
+        nodes.append(f"p{i+1}")
+        vrels.append(f"vrel{i}")
 
-    # Finalize the query
+    # Finalize the query to return nodes and relationships
     query += f"""
-    WITH 
-        {' + '.join(nodes)} AS nodes,
-        {' + '.join(relations)} AS relations
+    WITH apoc.coll.toSet([{', '.join(nodes)}]) AS allNodes,
+         apoc.coll.toSet([{', '.join(vrels)}]) AS allRels
+    UNWIND allNodes AS node
+    UNWIND allRels AS rel
     RETURN {{
-        nodes: nodes,
-        relations: relations
-    }} AS Result;
+        nodes: COLLECT(DISTINCT node),
+        relationships: COLLECT(DISTINCT rel)
+    }} AS graph
     """
 
     # Debugging: Print the generated query
     print(query)
 
-    # Execute the query
-    params = {"id_affaires": id_affaires, "depth": depth}
-    data = run_query(query, params)
+    # Execute the query with parameters
+    params = {
+        "id_affaires": id_affaires,
+        "depth": depth,
+        "rel_type": rel_type
+    }
+    
+    try:
+        data = parse_to_graph_with_transformer(query, params)
+        # print("rel1", data)
 
-    # Return the result as a JSON response
-    return JsonResponse(data, safe=False)
+        # Post-process to remove duplicate virtual relationships
+        if data and 'nodes' in data and 'edges' in data:
+            filtered_relationships = []
+            seen_node_pairs = set()
 
+            for rel in data['edges']:
+                # Extract start and end node IDs (assuming relationships have 'startNode' and 'endNode')
+
+                print("rel2", rel)
+                start_node = rel.get('startNode')
+                end_node = rel.get('endNode')
+                node_pair = (start_node, end_node)
+
+                # Only keep the first relationship for each node pair
+                if node_pair not in seen_node_pairs:
+                    filtered_relationships.append(rel)
+                    seen_node_pairs.add(node_pair)
+
+            # Update the data with filtered relationships
+            data['edges'] = filtered_relationships
+
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @api_view(['POST'])

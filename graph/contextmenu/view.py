@@ -311,7 +311,7 @@ def get_node_relationships(request):
     # Complete the query
     query += """
     RETURN n, r, related
-    LIMIT 100
+    LIMIT 2000
     """
 
     try:

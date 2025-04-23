@@ -60,9 +60,11 @@ urlpatterns = [
     ############################## Data Base Managment  ####################################
     path('list_all_databases/', list_all_databases_view, name='list_all_databases_view'),
     path('get_current_database/', get_current_database_view, name='get_current_database_view'),
+    path('delete_database/', delete_database_view, name='delete_database_view'),
     path('create_new_database/', create_new_database_view, name='create_new_database_view'),
     path('change_current_database/', change_current_database_view, name='change_current_database_view'),
     path('import_file_to_neo4j/', import_file_to_neo4j_view, name='import_file_to_neo4j_view'),
+    path('database_stats/', get_database_stats_view, name='get_database_stats_view'),
 
     ############################## style config  ####################################
     path('node-config/', style_view.get_node_config, name='node-config'),
