@@ -54,6 +54,7 @@ Please correct the query to avoid the error and return only the corrected Cypher
 """
     response = call_ollama(validation_prompt, model="hf.co/DavidLanz/text2cypher-gemma-2-9b-it-finetuned-2024v1:latest")
     return response.strip()
+
 @api_view(['POST'])
 def chatbot(request):
     
@@ -153,6 +154,59 @@ def chatbot(request):
     except Exception as e:
         # Log the error for debugging
         print(f"Error in chatbot endpoint: {str(e)}")
+        return Response(
+            {"error": "An unexpected error occurred"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+
+@api_view(['POST'])
+def chatbot_resume(request):
+    try:
+        # Parse the request body
+        data = json.loads(request.body)
+        raw_response = data.get('raw_response')  # Extract the raw response from the previous call
+        model = data.get('model')  # Extract the model
+        question=data.get('question')
+        cypher_query=data.get('cypher_query')
+        print(data)
+        if not raw_response:
+            return Response(
+                {"error": "No raw response provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not model:
+            return Response(
+                {"error": "No model provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        prompt = simple_prompet_resume(context=raw_response, question=question, cypher_query=cypher_query) # Adjust based on how simple_prompet works
+        resume_response = call_ollama(prompt=prompt, model=model)
+        # Extract the content between <Resume> tags
+        resume_match = re.search(r'<Resume>(.*?)</Resume>', resume_response, re.DOTALL)
+        if resume_match:
+            resumed_content = resume_match.group(1).strip()
+        else:
+            resumed_content = resume_response  # Fallback if no tags are found
+
+
+        # Return the resumed response
+        response_data = {
+            "response": resumed_content,
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    except json.JSONDecodeError:
+        return Response(
+            {"error": "Invalid JSON in request body"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error in chatbot_resume endpoint: {str(e)}")
         return Response(
             {"error": "An unexpected error occurred"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

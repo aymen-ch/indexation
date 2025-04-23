@@ -317,3 +317,50 @@ graph_generation_prompt = PromptTemplate(
     ),
     input_variables=["input_context"]
 )
+
+
+
+
+def simple_prompet_resume(context, question, cypher_query):
+    prompt = f"""
+Using the provided context (result of the previous Cypher query), the original Arabic question, and the previous Cypher query, generate a resumed response for a Neo4j database.
+
+
+
+**Input:**
+- **Context**: The result of the previous Cypher query execution, containing the data returned by the query.
+- **Question**: The original Arabic question asked by the user.
+- **Cypher Query**: The previous Cypher query that was executed.
+
+**Rules:**
+1. Analyze the context, question, and previous Cypher query to generate a meaningful continuation of the response.
+2. Adhere strictly to the schema: only use defined node labels, properties, and relationship types.
+3. Use node aliases (e.g., `(p:Personne)`).
+4. **Do not add any explanation, notes, or additional text under any circumstances.**
+5. **Output only the resumed response** in the specified format.
+6. The resumed response should be a natural continuation or enhancement of the previous result, potentially refining the query or summarizing the context in a user-friendly way.
+
+**Output Requirements:**
+- Return **only the resumed response** in this exact format:
+  <Resume>
+    ...
+  </Resume>
+
+**Context:**
+<Context>
+{context}
+</Context>
+
+**Question:**
+<Question>
+{question}
+</Question>
+
+**Previous Cypher Query:**
+<Cypher>
+{cypher_query}
+</Cypher>
+
+**Do not add any explanation, notes, or additional text under any circumstances**, just return the resumed response in the specified format.
+"""
+    return prompt

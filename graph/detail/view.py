@@ -261,25 +261,25 @@ def node_analysis(request):
         # Query to compute analytical properties for the node
         analysis_query = """
        MATCH (n)
-        WHERE id(n) = $id
-        OPTIONAL MATCH (n)<-[r_in]-()
-        OPTIONAL MATCH (n)-[r_out]->()
-        WITH COUNT(r_in) AS incoming_links,
-             COUNT(r_out) AS outgoing_links,
-             COLLECT(r_in) AS incoming_rels,
-             COLLECT(r_out) AS outgoing_rels
-        WITH incoming_links,
-             outgoing_links,
-             [rel IN incoming_rels | [k IN keys(rel) WHERE k <> 'identity' | rel[k]]] AS in_values,
-             [rel IN outgoing_rels | [k IN keys(rel) WHERE k <> 'identity' | rel[k]]] AS out_values
-        WITH incoming_links,
-             outgoing_links,
-             REDUCE(s = 0, vals IN in_values | s + REDUCE(inner_s = 0, v IN vals | inner_s + COALESCE(v, 0))) AS sum_incoming_values,
-             REDUCE(s = 0, vals IN out_values | s + REDUCE(inner_s = 0, v IN vals | inner_s + COALESCE(v, 0))) AS sum_outgoing_values
-        RETURN incoming_links,
-               outgoing_links,
-               sum_incoming_values,
-               sum_outgoing_values
+WHERE id(n) = $id
+OPTIONAL MATCH (n)<-[r_in]-()
+OPTIONAL MATCH (n)-[r_out]->()
+WITH COUNT(r_in) AS incoming_links,
+     COUNT(r_out) AS outgoing_links,
+     COLLECT(r_in) AS incoming_rels,
+     COLLECT(r_out) AS outgoing_rels
+WITH incoming_links,
+     outgoing_links,
+     [rel IN incoming_rels | [k IN keys(rel) WHERE k <> 'identity' | rel[k]]] AS in_values,
+     [rel IN outgoing_rels | [k IN keys(rel) WHERE k <> 'identity' | rel[k]]] AS out_values
+WITH incoming_links,
+     outgoing_links,
+     REDUCE(s = 0, vals IN in_values | s + REDUCE(inner_s = 0, v IN vals | inner_s + (CASE WHEN v IS NOT NULL AND toFloat(v) = toInteger(v) THEN COALESCE(toInteger(v), 0) ELSE 0 END))) AS sum_incoming_values,
+     REDUCE(s = 0, vals IN out_values | s + REDUCE(inner_s = 0, v IN vals | inner_s + (CASE WHEN v IS NOT NULL AND toFloat(v) = toInteger(v) THEN COALESCE(toInteger(v), 0) ELSE 0 END))) AS sum_outgoing_values
+RETURN incoming_links,
+       outgoing_links,
+       sum_incoming_values,
+       sum_outgoing_values
         """
         params = {"id": node_id}
         analysis_results = run_query(analysis_query, params, database=settings.NEO4J_DATABASE)
