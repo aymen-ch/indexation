@@ -91,6 +91,119 @@ RETURN p.birth_date AS تاريخ_الميلاد, p.national_id AS الرقم_ا
   """
     return prompet
 
+
+
+def simple_prompt_table(question):
+    prompt = f"""
+You are a Neo4j expert tasked with converting Arabic questions into Cypher queries for a Neo4j database. The user requests a table response, meaning the query should return tabular results with properties or aggregations. Translate the Arabic question mentally into English to understand its intent and map it to the provided English schema.
+
+**Database Schema:**
+<Schema>
+{schema_description}
+</Schema>
+
+**Input:**
+- The question is in Arabic, requesting a table response .
+- No specific nodes are selected; queries should apply broadly or as inferred from the question.
+
+**Rules:**
+1. Use node aliases (e.g., `(p:Personne)`).
+2. Adhere strictly to the schema: only use defined node labels, properties, and relationship types.
+3. Analyze the question carefully to map nodes, relationships, and properties accurately.
+4. Always use meaningful Arabic aliases for the returned properties (e.g., `p.name AS الاسم`, `COUNT(p) AS عدد_الأشخاص`).
+5. **Do not add any explanation, notes, or additional text under any circumstances.**
+6. **Output only the Cypher query** in the specified format.
+
+**Response Type Handling:**
+- **Table Response**:
+  - Return a tabular result with properties or aggregations.
+  - Use meaningful Arabic aliases for all returned properties.
+  - Example 1:
+    <Question>
+      ما هو متوسط مدة المكالمات الهاتفية لكل شخص؟
+    </Question>
+
+    <Query>
+      MATCH (p:Personne)-[:Proprietaire]->(ph:Phone)-[ph_call:Appel_telephone]->()
+      RETURN p.`تاريخ_الميلاد` AS تاريخ_الميلاد, p.`رقم التعريف الوطني` AS الرقم_الوطني, p.الاسم AS الاسم, p.اللقب AS اللقب, AVG(ph_call.duree_sec) AS متوسط_المدة
+    </Query>
+  - Example 2:
+    <Question>
+      كم عدد الأشخاص المرتبطين بكل قضية؟
+    </Question>
+
+    <Query>
+      MATCH (p:Personne)-[:Impliquer]->(a:Affaire)
+      RETURN a.Number AS رقم_القضية, COUNT(p) AS عدد_الأشخاص
+    </Query>
+
+**Output Requirements:**
+- Return **only the Cypher query** in this exact format:
+  <Query>
+    ...
+  </Query>
+
+**Question:**
+<Question>
+{question}
+</Question>
+
+"""
+    return prompt
+
+def simple_prompt_graph(question):
+    prompt = f"""
+You are a Neo4j expert tasked with converting Arabic questions into Cypher queries for a Neo4j database. The user requests a graph response, meaning the query should return the full path of relationships and nodes. Translate the Arabic question mentally into English to understand its intent and map it to the provided English schema.
+
+**Database Schema:**
+<Schema>
+{schema_description}
+</Schema>
+
+**Input:**
+- The question is in Arabic, requesting a graph response.
+- No specific nodes are selected; queries should apply broadly or as inferred from the question.
+
+**Rules:**
+1. Use node aliases (e.g., `(p:Personne)`).
+2. Adhere strictly to the schema: only use defined node labels, properties, and relationship types.
+3. Analyze the question carefully to map nodes, relationships, and properties accurately.
+4. Always return the full path using `path = ...` in the `MATCH` clause.
+5. **Do not add any explanation, notes, or additional text under any circumstances.**
+6. **Output only the Cypher query** in the specified format.
+
+**Response Type Handling:**
+- **Graph Response**:
+  - Return the full path of the Cypher query.
+  - Example 1:
+    <Question>
+      ما هي المكالمات الهاتفية لكل شخص؟
+    </Question>
+    <Query>
+      MATCH path=(p:Personne)-[pr:Proprietaire]->(ph:Phone)-[ph_call:Appel_telephone]->()
+      RETURN path
+    </Query>
+  - Example 2:
+    <Question>
+      'ماهي  دوائر التي تنتمي الى ولاية 'المدية
+    </Question>
+    <Query>
+      MATCH path = (d:Daira)-[:appartient]-(w:Wilaya {{nom_arabe: 'المدية'}})
+       RETURN path
+    </Query>
+
+**Output Requirements:**
+- Return **only the Cypher query** in this exact format:
+  <Query>
+    ...
+  </Query>
+
+**Question:**
+<Question>
+{question}
+</Question>
+"""
+    return prompt
 from neo4j import GraphDatabase
 from neo4j.exceptions import CypherSyntaxError
 
@@ -362,6 +475,8 @@ The resumed response should be:
 </Resume>
 """
     return prompt
+
+
 
 
 

@@ -15,6 +15,6 @@
     "name": "les affaires  dans la meme date ",
     "node_type": "Affaire",
     "id_field": "id",
-    "query": "MATCH (context:Affaire) WHERE id(context) = $id match (other:Affaire) where id(outher)<>  $id and outher.date=context.date RETURN other"
+    "query": "MATCH (context:Affaire) WHERE id(context) = $id match (other:Affaire) where id(other)<>  $id and other.date=context.date RETURN other"
   }
 ]

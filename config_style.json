@@ -67,7 +67,7 @@
       "labelKey": "num"
     },
     "Personne": {
-      "color": "#a1afad",
+      "color": "#519e93",
       "size": 120,
       "icon": "/icon/Personne.png",
       "labelKey": "رقم التعريف الوطني,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
@@ -82,7 +82,7 @@
       "color": "#20a77f",
       "size": 90,
       "icon": "/icon/Personne.png",
-      "labelKey": "ccp"
+      "labelKey": "Type_de_Transaction"
     },
     "NewType": {
       "size": 777,

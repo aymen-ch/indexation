@@ -72,12 +72,13 @@ def chatbot(request):
         # Generate the Cypher query using the LLM
         # formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
         if selected_nodes:
-            print(selected_nodes)
             # Use prompt with selected nodes if provided
             prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
         else:
-            # Use default prompt if no selected nodes
-            prompt = simple_prompet(question=question, type=answer_type)
+            if answer_type == 'graph':
+                prompt = simple_prompt_graph(question=question)
+            else:
+                prompt = simple_prompt_table(question=question)
         cypher_response = call_ollama(prompt=prompt, model=modele)
       
         # Extract the query between <Query> tags
