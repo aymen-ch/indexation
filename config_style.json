@@ -82,7 +82,7 @@
       "color": "#20a77f",
       "size": 90,
       "icon": "/icon/Personne.png",
-      "labelKey": "ccp"
+      "labelKey": "Type_de_Transaction"
     },
     "NewType": {
       "size": 777,
