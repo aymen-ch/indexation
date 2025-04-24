@@ -131,11 +131,12 @@ def getrelationData(request):
                     {"error": "Normal relation identity must be an integer."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-                
+            print("identity21",identity)
             query = """
-            MATCH ()-[n {identity: $identity}]-()
+            MATCH ()-[n]->()
+            WHERE id(n) = $identity
             RETURN {
-                identity: n.identity,
+                identity:  toString(id(n)),
                 type: type(n),
                 properties: properties(n)
             } as relation_data
