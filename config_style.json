@@ -81,8 +81,8 @@
     "Account": {
       "color": "#20a77f",
       "size": 90,
-      "icon": "/icon/Personne.png",
-      "labelKey": "Type_de_Transaction"
+      "icon": "/icon/accountant.png",
+      "labelKey": "ccp"
     },
     "NewType": {
       "size": 777,

@@ -74,6 +74,7 @@ def count_affaires(request):
         end_date = request.data.get('endDate', None)
         if not affaire_types:
             return JsonResponse({"error": "At least one Affaire_type is required."}, status=400)
+        print(wilaya_id)
         match_clause = """
         MATCH (crime:Affaire)
         WHERE crime.Type IN $affaire_types
@@ -500,7 +501,7 @@ def get_all_wilaya(request):
     try:
         query = """
         MATCH (w:Wilaya)
-        RETURN w.nom_francais AS wilaya_name, w.identity AS wilaya_id
+        RETURN w.nom_francais AS wilaya_name, id(w) AS wilaya_id
         ORDER BY w.nom_francais
         """
         results = run_query(query)
@@ -522,8 +523,8 @@ def get_daira_by_wilaya(request):
         print(wilya_id)
         query = """
         MATCH (w:Wilaya)<-[:appartient]-(d:Daira)
-        WHERE w.identity = $wilya_id
-        RETURN d.nom_francais AS daira_name, d.identity AS daira_id
+        WHERE id(w) = $wilya_id
+        RETURN d.nom_francais AS daira_name, id(d) AS daira_id
         ORDER BY d.nom_francais
         """
         params = {"wilya_id": wilya_id}
@@ -547,8 +548,8 @@ def get_commune_by_wilaya_and_daira(request):
      
         query = """
         MATCH (w:Wilaya)<-[:appartient]-(d:Daira)<-[:appartient]-(c:Commune)
-        WHERE w.identity = $wilaya_id AND d.identity = $daira_id
-        RETURN c.nom_francais AS commune_name, c.identity AS commune_id
+        WHERE id(w) = $wilaya_id AND id(d) = $daira_id
+        RETURN c.nom_francais AS commune_name, id(c) AS commune_id
         ORDER BY c.nom_francais
         """
         params = {"wilaya_id": wilaya_id, "daira_id": daira_id}
