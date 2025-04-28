@@ -105,7 +105,7 @@ def get_available_actions(request):
 def add_action(request):
     try:
         # Validate required fields
-        required_fields = ['name', 'node_type', 'id_field', 'query']
+        required_fields = ['name', 'node_type', 'id_field', 'query', 'node_id']
         for field in required_fields:
             if field not in request.data:
                 return Response(
@@ -119,9 +119,28 @@ def add_action(request):
             "id_field": request.data['id_field'],
             "query": request.data['query']
         }
+        node_id = request.data['node_id']
 
-        # Load existing actions
-      
+        # Step 1: Test the Cypher query
+        try:
+            query = new_action['query']
+            id_field = new_action['id_field']
+            parameters = {id_field: int(node_id)}
+            graph_data = parse_to_graph_with_transformer(query, parameters)
+
+            # Validate that the query returns nodes, relationships, or paths
+            if not graph_data["nodes"] and not graph_data["edges"]:
+                return Response(
+                    {"error": "Query did not return any nodes, relationships, or paths"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {"error": f"Invalid Cypher query: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Step 2: Load existing actions
         try:
             with open(CONFIG_FILE, 'r') as file:
                 actions_config = json.load(file)

@@ -67,7 +67,7 @@
       "labelKey": "num"
     },
     "Personne": {
-      "color": "#519e93",
+      "color": "#51579e",
       "size": 120,
       "icon": "/icon/Personne.png",
       "labelKey": "رقم التعريف الوطني,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
