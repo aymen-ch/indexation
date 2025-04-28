@@ -2,6 +2,8 @@ from langchain import LLMChain
 from langchain.prompts import FewShotPromptTemplate, PromptTemplate
 from langchain import LLMChain 
 from langchain.prompts import FewShotPromptTemplate, PromptTemplate
+from langchain_neo4j import Neo4jGraph
+
 
 schema_description = """
 use just the nodes and properties and relations that existe in this Database Schema:

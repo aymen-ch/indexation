@@ -1,18 +1,83 @@
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+import neo4j 
+from graph.utility import run_query,driver
 
-from graph.utility import run_query
-
+from graph.utility_neo4j import parse_to_graph_with_transformer
 # //////////////  neeed to aggregate properties /////////
+
+
+
+@api_view(['POST'])
+def ExpandAggregation(request):
+    # Get data from request
+    id_nodes = request.data.get("node_ids", [1160, 126224])  # Default to example IDs
+    aggregation_path = request.data.get("aggregationpath", ["Personne", "Impliquer", "Affaire", "Impliquer", "Personne"])
+
+    # Validate input
+    if not isinstance(id_nodes, list) or len(id_nodes) < 2:
+        return Response({"error": "At least two node IDs are required"}, status=400)
+    if not isinstance(aggregation_path, list) or len(aggregation_path) < 3:
+        return Response({"error": "Invalid aggregation path"}, status=400)
+
+    # Build the Cypher query
+    try:
+        # Construct the MATCH pattern dynamically
+        # Example: MATCH (p1:Personne {identity: 1160})-[:Impliquer]->(a:Affaire)-[:Impliquer]->(p2:Personne {identity: 126224})
+        start_node = aggregation_path[0]  # e.g., "Personne"
+        end_node = aggregation_path[-1]   # e.g., "Personne"
+        relationships = aggregation_path[1:-1]  # e.g., ["Impliquer", "Affaire", "Impliquer"]
+
+        # Build the relationship pattern
+        pattern_parts = []
+        current_var = 'n0'  # Starting variable for first node
+        for i, part in enumerate(relationships):
+            next_var = f'n{i+1}'
+            if i % 2 == 0:  # Relationship
+                pattern_parts.append(f'-[:{part}]-')
+            else:  # Node
+                pattern_parts.append(f'({next_var}:{part})')
+            current_var = next_var
+
+        # Construct the full Cypher query
+        query = (
+            f"MATCH path=(n0:{start_node} {{identity: {id_nodes[0]}}})"
+            f"{''.join(pattern_parts)}"
+            f"({current_var}:{end_node} {{identity: {id_nodes[-1]}}}) "
+            "RETURN  path"
+        )
+
+     
+
+        # Execute the query using the utility function
+        graph_result = driver.execute_query(query_=query,
+            result_transformer_=neo4j.Result.graph,
+        )
+        for node in graph_result.nodes:
+    # Extract the required parts
+                identity = node.get('properties')  # From properties dictionary
+
+                print(identity)
+        # Process the result
+        return Response({
+            "nodes": "hh",
+        
+        }, status=200)
+           
+
+    except Exception as e:
+        print(f"Error executing query: {str(e)}")
+        return Response({"error": f"Query failed: {str(e)}"}, status=500)
+
 @api_view(['POST'])
 def aggregate(request):
     id_nodes = request.data.get("node_ids", [1160, 126224, 129664, 129668, 136220, 1368, 1370, 34151, 34155])  # List of node IDs
     aggregation_type = request.data.get("aggregation_type", [["Personne", "Impliquer", "Affaire", "Impliquer", "Personne"]])
-    
+    type = request.data.get("type","memeaffaire")
     if not id_nodes:
         return Response({"error": "id_nodes parameter is required"}, status=400)
-    
+    print(id_nodes)
     query_parts = []
     params = {"id_nodes": id_nodes}
     alias_counter = {}  # Dictionary to track alias counts
@@ -47,14 +112,16 @@ def aggregate(request):
         match_clause = "MATCH " + "".join(match_clause)
 
         # Construct the WHERE clause to filter by node IDs
-        intermediate_aliases = aliases[1:-1]  # Exclude the first and last aliases
-        # intermediate_aliases = aliases
+        if len(sublist)==3:
+           intermediate_aliases = aliases  # Exclude the first and last aliases
+        else:
+            intermediate_aliases = aliases[1:-1]
         if intermediate_aliases:  # Only add WHERE clause if there are intermediate nodes
-            where_clause = "WHERE " + " AND ".join([f"{alias}.identity IN $id_nodes" for alias in intermediate_aliases])
+            where_clause = "WHERE " + " AND ".join([f"id({alias}) IN $id_nodes" for alias in intermediate_aliases])
         else:
             where_clause = ""  # No intermediate nodes, so no WHERE clause
 
-        # Construct the WITH and RETURN clauses with combined properties
+        # Construct the WITH and RETURN clauses with separated properties
         start_alias = aliases[0]  # First node
         end_alias = aliases[-1]   # Last node
         first_intermediate = aliases[1] if len(aliases) > 2 else start_alias  # First intermediate node
@@ -69,18 +136,30 @@ def aggregate(request):
             count({aliases[1]}) as count
         WITH 
             start_node, 
-            apoc.map.merge(properties(start_node), properties(first_intermediate_node)) AS start_properties, 
+            properties(start_node) AS start_node_properties,  /* Keep start node properties separate */
+            properties(first_intermediate_node) AS first_intermediate_properties,  /* Separate intermediate properties */
             end_node, 
-            apoc.map.merge(properties(end_node), properties(last_intermediate_node)) AS end_properties, 
+            properties(end_node) AS end_node_properties,  /* Keep end node properties separate */
+            properties(last_intermediate_node) AS last_intermediate_properties,  /* Separate intermediate properties */
             count
         WITH 
             CASE 
-                WHEN start_node.identity < end_node.identity 
-                THEN {{startId: start_node.identity, endId: end_node.identity, type: "{sublist[3]}", count: count}}
-                ELSE {{startId: end_node.identity, endId: start_node.identity, type: "{sublist[3]}", count: count}}
+                WHEN id(start_node) < id(end_node) 
+                THEN {{startId: id(start_node), endId: id(end_node), type:'{type}' , count: count}}
+                ELSE {{startId: id(end_node), endId: id(start_node), type: '{type}', count: count}}
             END AS relationship,
-            COLLECT(DISTINCT {{identity: start_node.identity, type: labels(start_node)[0], properties: start_properties}}) +
-            COLLECT(DISTINCT {{identity: end_node.identity, type: labels(end_node)[0], properties: end_properties}}) AS nodes
+            COLLECT(DISTINCT {{
+                id: id(start_node),
+                type: labels(start_node)[0], 
+                properties: start_node_properties,  /* Node's own properties */
+                aggregated_properties: first_intermediate_properties  /* Aggregated properties from intermediate node */
+            }}) +
+            COLLECT(DISTINCT {{
+                id: id(end_node), 
+                type: labels(end_node)[0], 
+                properties: end_node_properties,  /* Node's own properties */
+                aggregated_properties: last_intermediate_properties  /* Aggregated properties from intermediate node */
+            }}) AS nodes
         RETURN nodes, COLLECT(DISTINCT relationship) AS relationships
         """
 
@@ -104,17 +183,17 @@ def aggregate(request):
     UNWIND combined_nodes AS node
     RETURN 
         COLLECT(DISTINCT {
-            identity: node.identity,
+            id: node.id,
             type: node.type,
-            properties: node.properties
+            properties: node.properties,  /* Individual node properties */
+            aggregated_properties: node.aggregated_properties  /* Aggregated properties from related nodes */
         }) AS nodes,
         combined_relationships AS relationships
     """
-
+    print(combined_query)
     try:
         # Run the query using the provided helper function
         results = run_query(combined_query, params)
-
         if results:
             data = results[0]
             nodes = data.get("nodes", [])
@@ -421,221 +500,165 @@ RETURN {
 
 
 
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from django.http import JsonResponse
+
 @api_view(['POST'])
 def aggregate_with_algo(request):
+    # Extract parameters from the request body
+    id_affaires = request.data.get('id_affaires', [1171])  # Default value if not provided
+    depth = int(request.data.get('depth', 3))  # Default depth if not provided
+    patterns = request.data.get('patterns', [
+        "-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-"
+    ])  # Default pattern if not provided
+    rel_type = request.data.get('rel_type', 'CONNECTED')  # Default relationship type
+
+    # Validate inputs
+    if depth < 1:
+        return JsonResponse({"error": "Depth must be at least 1."}, status=400)
+    if not patterns:
+        return JsonResponse({"error": "At least one pattern must be provided."}, status=400)
+
+    # Initialize the base query
+    query = """
+    UNWIND $id_affaires AS id_affaire
+    MATCH (c:Affaire)-[r0:Impliquer]-(p1:Personne)
+    WHERE c.identity = id_affaire
+    WITH id_affaire, c, p1, r0
+    """
+
+    # Lists to collect nodes and virtual relationships
+    nodes = ["c", "p1"]
+    vrels = ["r0"]  # Keep the original Impliquer relationship
+
+    # Build the query dynamically for each depth level and pattern
+    for i in range(1, depth):
+        # For each depth level, match any of the provided patterns
+        pattern_matches = []
+        for pattern in patterns:
+            pattern_match = f"(p{i}){pattern}(p{i+1}:Personne)"
+            pattern_matches.append(pattern_match)
+
+        # Combine all pattern matches with OR logic
+        match_clause = "MATCH " + " OR ".join(pattern_matches)
+        query += f"""
+        {match_clause}
+        WHERE id_affaire IN p{i+1}._affiresoutin AND p{i+1}._Lvl_of_Implications[{i}] > p{i}._Lvl_of_Implications[{i-1}]
+        CALL apoc.create.vRelationship(p{i}, $rel_type, {{depth: {i}, pattern: '{patterns[0]}'}}, p{i+1}) YIELD rel AS vrel{i}
+        WITH id_affaire, {', '.join(nodes)}, {', '.join(vrels)}, vrel{i}, p{i+1}
+        """
+        nodes.append(f"p{i+1}")
+        vrels.append(f"vrel{i}")
+
+    # Finalize the query to return nodes and relationships
+    query += f"""
+    WITH apoc.coll.toSet([{', '.join(nodes)}]) AS allNodes,
+         apoc.coll.toSet([{', '.join(vrels)}]) AS allRels
+    UNWIND allNodes AS node
+    UNWIND allRels AS rel
+    RETURN {{
+        nodes: COLLECT(DISTINCT node),
+        relationships: COLLECT(DISTINCT rel)
+    }} AS graph
+    """
+
+    # Debugging: Print the generated query
+    print(query)
+
+    # Execute the query with parameters
+    params = {
+        "id_affaires": id_affaires,
+        "depth": depth,
+        "rel_type": rel_type
+    }
+    
+    try:
+        data = parse_to_graph_with_transformer(query, params)
+        # print("rel1", data)
+
+        # Post-process to remove duplicate virtual relationships
+        if data and 'nodes' in data and 'edges' in data:
+            filtered_relationships = []
+            seen_node_pairs = set()
+
+            for rel in data['edges']:
+                # Extract start and end node IDs (assuming relationships have 'startNode' and 'endNode')
+
+                print("rel2", rel)
+                start_node = rel.get('startNode')
+                end_node = rel.get('endNode')
+                node_pair = (start_node, end_node)
+
+                # Only keep the first relationship for each node pair
+                if node_pair not in seen_node_pairs:
+                    filtered_relationships.append(rel)
+                    seen_node_pairs.add(node_pair)
+
+            # Update the data with filtered relationships
+            data['edges'] = filtered_relationships
+
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+def aggregate_with_algo_old(request):
     # Extract the id_affaires and depth from the request body
     id_affaires = request.data.get('id_affaires', [1171])  # Default value if not provided
     depth = int(request.data.get('depth', 3))  # Default depth if not provided
 
-    # Initialize the query variable
-    query = ""
+    # Validate depth
+    if depth < 1:
+        return JsonResponse({"error": "Depth must be at least 1."}, status=400)
 
-    if depth == 1:
-        query = """
-        // For depth = 1, return Affaire and directly involved Personne nodes
-        UNWIND $id_affaires AS id_affaire
-        MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
-        WHERE c.identity = id_affaire
-        WITH c, p1
-        // Collect all nodes and relations
-        WITH 
-            COLLECT(DISTINCT {identity: c.identity, type: "Affaire"}) + 
-            COLLECT(DISTINCT {identity: p1.identity, type: "Personne"}) AS nodes,
-            COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: "Impliquer"}) AS relations
-        // Return the aggregated result
-        RETURN {
-            nodes: nodes,
-            relations: relations
-        } AS Result;
+    # Initialize the query variable
+    query = """
+    UNWIND $id_affaires AS id_affaire
+    MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
+    WHERE c.identity = id_affaire
+    """
+
+    # Dynamically build the query for the given depth
+    nodes = ["COLLECT(DISTINCT {identity: c.identity, type: 'Affaire'})", 
+             "COLLECT(DISTINCT {identity: p1.identity, type: 'Personne'})"]
+    relations = ["COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: 'Impliquer'})"]
+
+    for i in range(1, depth):
+        query += f"""
+        MATCH (p{i})-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-(p{i+1}:Personne)
+        WHERE id_affaire IN p{i+1}._affiresoutin AND p{i+1}._Lvl_of_Implications[{i}] > p{i}._Lvl_of_Implications[{i-1}]
         """
-    elif depth == 2:
-        query = """
-        // For depth = 2, return the entire chain
-        UNWIND $id_affaires AS id_affaire
-        MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
-        WHERE c.identity = id_affaire
-        MATCH (p1)-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-(p2:Personne)
-        WHERE id_affaire IN p2._affiresoutin
-        WITH c, p1, p2
-        // Collect all nodes and relations
-        WITH 
-            COLLECT(DISTINCT {identity: c.identity, type: "Affaire"}) + 
-            COLLECT(DISTINCT {identity: p1.identity, type: "Personne"}) + 
-            COLLECT(DISTINCT {identity: p2.identity, type: "Personne"}) AS nodes,
-            COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: "Impliquer"}) + 
-            COLLECT(DISTINCT {source: p1.identity, target: p2.identity, relation: "Contact with phone"}) AS relations
-        // Return the aggregated result
-        RETURN {
-            nodes: nodes,
-            relations: relations
-        } AS Result;
-        """
-    elif depth == 3:
-        query = """
-        // For depth = 3, return the entire chain
-        UNWIND $id_affaires AS id_affaire
-        MATCH (c:Affaire)-[:Impliquer]-(p1:Personne)
-        WHERE c.identity = id_affaire
-        MATCH (p1)-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-(p2:Personne)
-        WHERE id_affaire IN p2._affiresoutin
-        MATCH (p2)-[:Proprietaire]-(:Phone)-[:Appel_telephone]-(:Phone)-[:Proprietaire]-(p3:Personne)
-        WHERE id_affaire IN p3._affireleader
-        WITH c, p1, p2, p3
-        // Collect all nodes and deduplicate
-        WITH 
-            COLLECT(DISTINCT {identity: c.identity, type: "Affaire"}) + 
-            COLLECT(DISTINCT {identity: p1.identity, type: "Personne"}) + 
-            COLLECT(DISTINCT {identity: p2.identity, type: "Personne"}) + 
-            COLLECT(DISTINCT {identity: p3.identity, type: "Personne"}) AS nodes,
-            // Collect all edges with a standardized direction
-            COLLECT(DISTINCT CASE 
-                WHEN p1.identity < p2.identity THEN {source: p1.identity, target: p2.identity, relation: "Contact with phone"}
-                ELSE {source: p2.identity, target: p1.identity, relation: "Contact with phone"}
-            END) +
-            COLLECT(DISTINCT CASE 
-                WHEN p2.identity < p3.identity THEN {source: p2.identity, target: p3.identity, relation: "Contact with phone"}
-                ELSE {source: p3.identity, target: p2.identity, relation: "Contact with phone"}
-            END) +
-            COLLECT(DISTINCT {source: c.identity, target: p1.identity, relation: "Impliquer"}) AS relations
-        // Return the aggregated result
-        RETURN {
-            nodes: nodes,
-            relations: relations
-        } AS Result;
-        """
-    else:
-        return JsonResponse({"error": "Invalid depth value. Depth must be 1, 2, or 3."}, status=400)
+        nodes.append(f"COLLECT(DISTINCT {{identity: p{i+1}.identity, type: 'Personne'}})")
+        relations.append(f"COLLECT(DISTINCT {{source: p{i}.identity, target: p{i+1}.identity, relation: 'Contact with phone'}})")
+
+    # Finalize the query
+    query += f"""
+    WITH 
+        {' + '.join(nodes)} AS nodes,
+        {' + '.join(relations)} AS relations
+    RETURN {{
+        nodes: nodes,
+        relations: relations
+    }} AS Result;
+    """
 
     # Print the query for debugging
-    print("identity : ", id_affaires)
+    # print("identity : ", id_affaires)
     print(query)
+
     # Execute the query using the run_query function
     params = {"id_affaires": id_affaires, "depth": depth}
     data = run_query(query, params)
 
-    print('result : ', data)
+    # print('result : ', data)
 
     # Return the result as a JSON response
     return JsonResponse(data, safe=False)
 
-@api_view(['POST'])
-def withcall(request):
-    # Extract the date and depth from the request body
-    startdate = request.data.get('startdate', '02-01-2023')  # Default date if not provided
-    enddate = request.data.get('enddate', '02-01-2023')  # Default date if not provided
-    depth = int(request.data.get('depth', 2))  # Default depth if not provided
-
-    # Base query
-    query = """
-    MATCH (a:Affaire)-[:Impliquer]-(p1:Personne)-[:Proprietaire]-(ph1:Phone)
-    WHERE a.date >= $startdate AND a.date <= $enddate
-    WITH a, p1, ph1,
-         collect({
-             identity: p1.identity,
-             type: "Personne",
-             level: 1  // Level 1 for personnes directly connected to Affaire
-         }) AS personnesNodes,
-         collect({
-             source: a.identity,
-             target: p1.identity,
-             type: "Impliquer"
-         }) AS relations
-    """
-
-    # Level 1: Find p2 connected to p1 via phone calls (optional)
-    if depth >= 1:
-        query += """
-        OPTIONAL MATCH (ph1)-[:Appel_telephone]-(ph2:Phone)-[:Proprietaire]-(p2:Personne)
-        WHERE p2.identity IS NOT NULL
-        WITH a, p1, personnesNodes, relations, ph1, ph2, p2
-        // Calculate callCount between p1 and p2
-        OPTIONAL MATCH (ph1)-[call:Appel_telephone]-(ph2)
-        WITH a, p1, personnesNodes, relations, p2, count(call) AS callCount
-        WITH a, p1, personnesNodes, relations,
-             collect({
-                 identity: p2.identity,
-                 type: "Personne",
-                 level: 2  // Level 2 for personnes connected via phone calls
-             }) AS personnesLevel1Nodes,
-             collect({
-                 source: p1.identity,
-                 target: p2.identity,
-                 type: "Contact",
-                 callCount: callCount  // Include callCount in the relationship
-             }) AS relationsLevel1,
-             collect(p2) AS p2List  // Collect p2 for use in Level 2
-        """
-
-    # Level 2: Find p3 connected to p2 via phone calls (optional)
-    if depth >= 2:
-        query += """
-        OPTIONAL MATCH (p2)-[:Proprietaire]-(ph2:Phone)-[:Appel_telephone]-(ph3:Phone)-[:Proprietaire]-(p3:Personne)
-        WHERE p2 IN p2List AND p3.identity IS NOT NULL  // Ensure p2 is from Level 1 and p3 has a non-null identity
-        WITH a, p1, personnesNodes, relations, personnesLevel1Nodes, relationsLevel1, p2, p3, ph2, ph3
-        // Calculate callCount between p2 and p3
-        OPTIONAL MATCH (ph2)-[call:Appel_telephone]-(ph3)
-        WITH a, p1, personnesNodes, relations, personnesLevel1Nodes, relationsLevel1, p2, p3, count(call) AS callCount
-        WITH a, p1, personnesNodes, relations, personnesLevel1Nodes, relationsLevel1,
-             collect({
-                 identity: p3.identity,
-                 type: "Personne",
-                 level: 3  // Level 3 for personnes connected via phone calls to Level 2
-             }) AS personnesLevel2Nodes,
-             collect({
-                 source: p2.identity,
-                 target: p3.identity,
-                 type: "Contact",
-                 callCount: callCount  // Include callCount in the relationship
-             }) AS relationsLevel2
-        """
-
-    # Combine all nodes and relationships
-    if depth == 0:
-        query += """
-        WITH a,
-             personnesNodes + [{identity: a.identity, type: "Affaire", level: 0}] AS allNodes,  // Level 0 for Affaire
-             relations AS allRelations
-        """
-    elif depth == 1:
-        query += """
-        WITH a,
-             personnesNodes + personnesLevel1Nodes + [{identity: a.identity, type: "Affaire", level: 0}] AS allNodes,  // Level 0 for Affaire
-             relations + relationsLevel1 AS allRelations
-        """
-    elif depth >= 2:
-        query += """
-        WITH a,
-             personnesNodes + personnesLevel1Nodes + personnesLevel2Nodes + [{identity: a.identity, type: "Affaire", level: 0}] AS allNodes,  // Level 0 for Affaire
-             relations + relationsLevel1 + relationsLevel2 AS allRelations
-        """
-
-    # Filter out nodes and relationships with null identities
-    query += """
-    WITH a,
-         [node IN allNodes WHERE node.identity IS NOT NULL] AS filteredNodes,
-         [rel IN allRelations WHERE rel.source IS NOT NULL AND rel.target IS NOT NULL] AS filteredRelations
-    // Collect all nodes and relationships across all Affaire entities
-    WITH 
-         collect(filteredNodes) AS allFilteredNodes,
-         collect(filteredRelations) AS allFilteredRelations
-    // Flatten the lists and remove duplicates
-    WITH 
-         apoc.coll.toSet(apoc.coll.flatten(allFilteredNodes)) AS nodes,
-         apoc.coll.toSet(apoc.coll.flatten(allFilteredRelations)) AS relations
-    // Return a single JSON object containing all nodes and relationships
-    RETURN {
-        nodes: nodes,
-        relations: relations
-    } AS result
-    """
-
-    # Print the query for debugging
-    print(query)
-
-    # Execute the query using the run_query function
-    params = {"startdate": startdate, "enddate": enddate}
-    data = run_query(query, params)
 
 
-    # Return the result as a JSON response
-    return JsonResponse(data, safe=False)
+

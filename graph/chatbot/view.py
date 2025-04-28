@@ -34,6 +34,7 @@ def execute_query(request):
         # Handle any errors
         return JsonResponse({'error': str(e)}, status=500)
     
+import re
 def validate_query(generated_query, schema_description, error):
     validation_prompt = f"""
 Given the following Neo4j database schema:
@@ -44,28 +45,50 @@ And the following Cypher query:
 and the error given by Neo4j:
 {error}
 
-Please return only the corrected Cypher query without any explanation.
+Please correct the query to avoid the error and return only the corrected Cypher query without any explanation  in this format
+
+<Query>
+   ....
+</Query>
+.
 """
     response = call_ollama(validation_prompt, model="hf.co/DavidLanz/text2cypher-gemma-2-9b-it-finetuned-2024v1:latest")
     return response.strip()
+
 @api_view(['POST'])
 def chatbot(request):
-
+    
     try:
         # Parse the request body
         data = json.loads(request.body)
         question = data.get('question')  # Extract the user's question
         answer_type = data.get('answer_type', 'Text')  # Default to 'Text' if not provided
-
+        modele = data.get('model')  # Default to 'Text' if not provide
+        selected_nodes = data.get('selected_nodes', '')
+        print(request.body)
         if not question:
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Generate the Cypher query using the LLM
-        formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
-        cypher_query = call_ollama(formatted_prompt, model="hf.co/DavidLanz/text2cypher-gemma-2-9b-it-finetuned-2024v1:latest")
-        
+        # formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
+        if selected_nodes:
+            # Use prompt with selected nodes if provided
+            prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
+        else:
+            if answer_type == 'graph':
+                prompt = simple_prompt_graph(question=question)
+            else:
+                prompt = simple_prompt_table(question=question)
+        cypher_response = call_ollama(prompt=prompt, model=modele)
+      
+        # Extract the query between <Query> tags
+        query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
+        if query_match:
+            cypher_query = query_match.group(1).strip()
+        else:
+            cypher_query = cypher_response  # Fallback if no tags are found
         # Replace specific terms in the Cypher query
-        cypher_query = cypher_query.replace("nationel_id", "`رقم التعريف الوطني`")
+        cypher_query = cypher_query.replace("national_id", "`رقم التعريف الوطني`")
         cypher_query = cypher_query.replace("birth_date", "`تاريخ الميلاد`")
         cypher_query = cypher_query.replace("firstname", "الاسم")
         cypher_query = cypher_query.replace("lastname", "اللقب")
@@ -79,26 +102,33 @@ def chatbot(request):
             # If the query execution fails, attempt to validate and correct it
             print(f"Query failed with error: {query_result}")
             corrected_query = validate_query(cypher_query, schema_description, query_result)
-            print("Corrected Cypher Query:", corrected_query)
+            query_match = re.search(r'<Query>(.*?)</Query>', corrected_query, re.DOTALL)
+            if query_match:
+                cypher_query = query_match.group(1).strip()
+            else:
+                cypher_query = corrected_query  # Fallback if no tags are found
+
             
             # Re-execute the corrected query
-            query_result, success = execute_query_for_response_generation(corrected_query)
+            query_result, success = execute_query_for_response_generation(cypher_query)
             
             if not success:
                 # If the corrected query still fails, return the error
                 return Response(
                     {
-                        "cypher_query": corrected_query,
+                        "cypher": cypher_query,
                         "response": 'je ne peux pas répondre'  # Updated error message
                     },
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    status=status.HTTP_200_OK
                 )
             else:
                 # Update cypher_query to the corrected one for the response
-                cypher_query = corrected_query
+                cypher_query = cypher_query
 
         # Handle response based on answer type
         if answer_type == 'graph':
+            return JsonResponse({"cypher":cypher_query}, status=status.HTTP_200_OK)
+        if answer_type == 'table':
             return JsonResponse({"cypher":cypher_query}, status=status.HTTP_200_OK)
 
         elif answer_type == 'JSON':
@@ -106,20 +136,16 @@ def chatbot(request):
             return Response(
                 {
                     "response": query_result,
-                    "cypher_query": cypher_query
+                    "cypher": cypher_query
                 },
                 status=status.HTTP_200_OK
             )
 
         else:
-            # For 'Text' answer type, generate a human-readable response
-            formatted_table_prompt = zero_shot_prompt.format(input_question=question, Cypher=cypher_query, input_context=query_result)
-            answer = call_ollama(formatted_table_prompt, model="hf.co/DavidLanz/text2cypher-gemma-2-9b-it-finetuned-2024v1:latest")
-            
             return Response(
                 {
-                    "response": answer,
-                    "cypher_query": cypher_query
+                    "response": query_result,
+                    "cypher": cypher_query
                 },
                 status=status.HTTP_200_OK
             )
@@ -133,6 +159,60 @@ def chatbot(request):
     except Exception as e:
         # Log the error for debugging
         print(f"Error in chatbot endpoint: {str(e)}")
+        return Response(
+            {"error": "An unexpected error occurred"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+
+@api_view(['POST'])
+def chatbot_resume(request):
+    try:
+        # Parse the request body
+        data = json.loads(request.body)
+        raw_response = data.get('raw_response')  # Extract the raw response from the previous call
+        model = data.get('model')  # Extract the model
+        question=data.get('question')
+        cypher_query=data.get('cypher_query')
+        print(data)
+        if not raw_response:
+            return Response(
+                {"error": "No raw response provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not model:
+            return Response(
+                {"error": "No model provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        prompt = simple_prompet_resume(context=raw_response, question=question, cypher_query=cypher_query) # Adjust based on how simple_prompet works
+        resume_response = call_ollama(prompt=prompt, model=model)
+        # Extract the content between <Resume> tags
+        print(resume_response)
+        resume_match = re.search(r'<Resume>(.*?)</Resume>', resume_response, re.DOTALL)
+        if resume_match:
+            resumed_content = resume_match.group(1).strip()
+        else:
+            resumed_content = resume_response  # Fallback if no tags are found
+
+        
+        # Return the resumed response
+        response_data = {
+            "response": resumed_content,
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    except json.JSONDecodeError:
+        return Response(
+            {"error": "Invalid JSON in request body"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error in chatbot_resume endpoint: {str(e)}")
         return Response(
             {"error": "An unexpected error occurred"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
