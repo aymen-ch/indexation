@@ -64,10 +64,10 @@
       "color": "#dbc357",
       "size": 112,
       "icon": "/icon/phone.png",
-      "labelKey": "num"
+      "labelKey": "degree_in,total_degree_second"
     },
     "Personne": {
-      "color": "#22aa98",
+      "color": "#519e93",
       "size": 120,
       "icon": "/icon/Personne.png",
       "labelKey": "رقم التعريف الوطني,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
@@ -81,8 +81,8 @@
     "Account": {
       "color": "#20a77f",
       "size": 90,
-      "icon": "/icon/Personne.png",
-      "labelKey": "Type_de_Transaction"
+      "icon": "/icon/accountant.png",
+      "labelKey": "ccp"
     },
     "NewType": {
       "size": 777,

@@ -76,9 +76,18 @@ def get_available_actions(request):
         with open(CONFIG_FILE, 'r') as file:
             actions_config = json.load(file)
 
-        # Filter actions by node type
+        # Filter actions by node type and include all relevant fields
         available_actions = [
-            {"name": action["name"], "node_type": action["node_type"]}
+            {
+                "id": action.get("id"),  # Include if available
+                "name": action["name"],
+                "node_type": action["node_type"],
+                # "id_field": action.get("id_field", "id"),  # Default to 'id' if not specified
+                "query": action["query"],
+                "description": action["description"],  # Include if available
+                # "created_at": action.get("created_at"),  # Include if available
+                # "created_by": action.get("created_by")  # Include if available
+            }
             for action in actions_config
             if action["node_type"] == node_type
         ]
@@ -100,12 +109,11 @@ def get_available_actions(request):
     
 
 
-
 @api_view(['POST'])
 def add_action(request):
     try:
         # Validate required fields
-        required_fields = ['name', 'node_type', 'id_field', 'query']
+        required_fields = ['name', 'description', 'node_type', 'id_field', 'query', 'node_id']
         for field in required_fields:
             if field not in request.data:
                 return Response(
@@ -115,13 +123,33 @@ def add_action(request):
 
         new_action = {
             "name": request.data['name'],
+            "description": request.data['description'],  # Added description field
             "node_type": request.data['node_type'],
             "id_field": request.data['id_field'],
             "query": request.data['query']
         }
+        node_id = request.data['node_id']
 
-        # Load existing actions
-      
+        # Step 1: Test the Cypher query
+        try:
+            query = new_action['query']
+            id_field = new_action['id_field']
+            parameters = {id_field: int(node_id)}
+            graph_data = parse_to_graph_with_transformer(query, parameters)
+
+            # Validate that the query returns nodes, relationships, or paths
+            if not graph_data["nodes"] and not graph_data["edges"]:
+                return Response(
+                    {"error": "Query did not return any nodes, relationships, or paths"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {"error": f"Invalid Cypher query: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Step 2: Load existing actions
         try:
             with open(CONFIG_FILE, 'r') as file:
                 actions_config = json.load(file)
@@ -279,43 +307,41 @@ def affaire_in_the_same_region(request):
             {"error": f"Error executing query: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 @api_view(['POST'])
 def get_node_relationships(request):
-    # Get data from the request body
     print(request.data)
     node_type = request.data.get('node_type')
-    id = request.data.get('id',12)
-    relation_type = request.data.get('relation_type')  # Optional: Filter by specific relation type
+    id = request.data.get('id', 12)
+    relation_type = request.data.get('relation_type')  # Optional
+    limit = request.data.get('expandLimit', 100)
+    sense = request.data.get('expandDirection', 'In')
 
-    # if not node_type or not id:
-    #     return Response(
-    #         {"error": "Missing or invalid 'node_type' or 'id'."},
-    #         status=status.HTTP_400_BAD_REQUEST,
-    #     )
+    parameters = {'id': id, 'limit': limit}
 
-    # Construct the Cypher query dynamically based on provided properties
-    parameters = {}
-   
-    # Base Cypher query with relationships
+    # Determine the relationship direction
+    if sense == 'In':
+        relationship_pattern = "<-[r]-"
+    elif sense == 'Out':
+        relationship_pattern = "-[r]->"
+    else:  # both
+        relationship_pattern = "-[r]-"
+
+    # Base Cypher query
     query = f"""
-    MATCH (n:{node_type})-[r]-(related)
-    WHERE  id(n)={id}
+    MATCH (n:{node_type}){relationship_pattern}(related)
+    WHERE id(n) = $id
     """
 
-    # Add condition to filter by specific relationship type if provided
     if relation_type:
-        query += f" AND type(r) = $relation_type"
+        query += " AND type(r) = $relation_type"
         parameters['relation_type'] = relation_type
 
-    # Complete the query
     query += """
     RETURN n, r, related
-    LIMIT 2000
+    LIMIT $limit
     """
-
+    print(query)
     try:
-        # Use the transformer-based parser to get graph data
         graph_data = parse_to_graph_with_transformer(query, parameters)
         print(graph_data)
         return Response(graph_data, status=status.HTTP_200_OK)
@@ -331,6 +357,7 @@ def get_virtual_relationships(request):
     id = request.data.get('id')
     virtual_relation = request.data.get('virtual_relation')
     path = request.data.get('path')
+    limit= request.data.get('limit',100)
 
     # Validate input
     if not all([node_type, id, virtual_relation, path]):
@@ -392,7 +419,7 @@ def get_virtual_relationships(request):
         MATCH (n0:{node_type}) {"".join(query_parts)}
         WHERE id(n0) = $id
         RETURN id(n0) AS start_id, n0 AS start_node, id({end_node_var}) AS end_id, {end_node_var} AS end_node
-        LIMIT 100
+        LIMIT {limit}
         """
 
         # Execute the query using run_query
