@@ -64,7 +64,7 @@
       "color": "#dbc357",
       "size": 112,
       "icon": "/icon/phone.png",
-      "labelKey": "num"
+      "labelKey": "degree_in,total_degree_second"
     },
     "Personne": {
       "color": "#51579e",

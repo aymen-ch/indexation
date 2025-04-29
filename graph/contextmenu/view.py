@@ -76,9 +76,18 @@ def get_available_actions(request):
         with open(CONFIG_FILE, 'r') as file:
             actions_config = json.load(file)
 
-        # Filter actions by node type
+        # Filter actions by node type and include all relevant fields
         available_actions = [
-            {"name": action["name"], "node_type": action["node_type"]}
+            {
+                "id": action.get("id"),  # Include if available
+                "name": action["name"],
+                "node_type": action["node_type"],
+                # "id_field": action.get("id_field", "id"),  # Default to 'id' if not specified
+                "query": action["query"],
+                "description": action["description"],  # Include if available
+                # "created_at": action.get("created_at"),  # Include if available
+                # "created_by": action.get("created_by")  # Include if available
+            }
             for action in actions_config
             if action["node_type"] == node_type
         ]
@@ -100,12 +109,11 @@ def get_available_actions(request):
     
 
 
-
 @api_view(['POST'])
 def add_action(request):
     try:
         # Validate required fields
-        required_fields = ['name', 'node_type', 'id_field', 'query', 'node_id']
+        required_fields = ['name', 'description', 'node_type', 'id_field', 'query', 'node_id']
         for field in required_fields:
             if field not in request.data:
                 return Response(
@@ -115,6 +123,7 @@ def add_action(request):
 
         new_action = {
             "name": request.data['name'],
+            "description": request.data['description'],  # Added description field
             "node_type": request.data['node_type'],
             "id_field": request.data['id_field'],
             "query": request.data['query']
@@ -311,9 +320,9 @@ def get_node_relationships(request):
 
     # Determine the relationship direction
     if sense == 'In':
-        relationship_pattern = "-[r]->"
-    elif sense == 'Out':
         relationship_pattern = "<-[r]-"
+    elif sense == 'Out':
+        relationship_pattern = "-[r]->"
     else:  # both
         relationship_pattern = "-[r]-"
 
@@ -331,7 +340,7 @@ def get_node_relationships(request):
     RETURN n, r, related
     LIMIT $limit
     """
-
+    print(query)
     try:
         graph_data = parse_to_graph_with_transformer(query, parameters)
         print(graph_data)

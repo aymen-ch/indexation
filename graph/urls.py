@@ -30,6 +30,11 @@ urlpatterns = [
     path('getdata/', view_detail.getdata, name='getdata'),
     path('getrelationData/', view_detail.getrelationData, name='getrelationData'),
     path('node-analysis/', view_detail.node_analysis, name='nodeanalysis'),
+    path('node_type_attribute_insert/', view_detail.node_type_attribute_insert, name='node_type_attribute_insert'),
+    path('get_incoming_relationship_attributes/', view_detail.get_incoming_relationship_attributes, name='get_incoming_relationship_attributes'),
+    path('insert_node_attribute/', view_detail.insert_node_attribute, name='insert_node_attribute'),
+    path('get_node_properties/', view_detail.get_node_properties, name='get_node_properties'),
+    path('get_outgoing_relationship_attributes/', view_detail.get_outgoing_relationship_attributes, name='get_outgoing_relationship_attributes'),
     ############################### contextmenu expand + actions ###################################
     path('get_possible_relations/', view_contextmenu.get_possible_relations, name='get_possible_relations'),
     path('get_node_relationships/', view_contextmenu.get_node_relationships, name='get_node_relationships'),
