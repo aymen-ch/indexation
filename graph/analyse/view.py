@@ -21,6 +21,46 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.conf import settings
 
+
+@api_view(['GET'])
+def get_relationship_types_for_node_type(request):
+    """
+    API endpoint to get all relationship types connected to a given node type.
+    
+    Parameters:
+    - nodeType: The node type/label (e.g., 'Person', 'Movie')
+    
+    Returns:
+    - List of all relationship types connected to the specified node type
+    """
+    node_type = request.query_params.get('nodeType')
+    
+    if not node_type:
+        return Response(
+            {"error": "nodeType parameter is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
+            # Query to get all relationship types connected to the node type
+            query = f"""
+            MATCH (n:{node_type})-[r]-()
+            RETURN DISTINCT type(r) AS relationship_type
+            """
+            
+            result = session.run(query)
+            relationship_types = [record["relationship_type"] for record in result]
+
+            return Response({
+                "node_type": node_type,
+                "relationship_types": relationship_types,
+                "count": len(relationship_types)
+            }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['GET'])
 def get_attribute_values_for_node_type(request):
     """
