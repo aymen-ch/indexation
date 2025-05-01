@@ -37,11 +37,14 @@ def get_possible_relations(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Construct the Cypher query to return relationship type and node labels
+    # Construct the Cypher query to return relationship type, node labels, and count
     query = f"""
     MATCH (n:{node_type})-[r]-(m)
     WHERE id(n) = $id
-    RETURN DISTINCT type(r) AS relationship_type, labels(n) AS start_labels, labels(m) AS end_labels
+    RETURN DISTINCT type(r) AS relationship_type, 
+                    labels(n) AS start_labels, 
+                    labels(m) AS end_labels, 
+                    COUNT(r) AS relation_count
     """
     parameters = {"id": id}
 
@@ -51,14 +54,14 @@ def get_possible_relations(request):
             {
                 "name": record["relationship_type"],
                 "startNode": record["start_labels"][0],  # Assume primary label is first
-                "endNode": record["end_labels"][0]       # Assume primary label is first
+                "endNode": record["end_labels"][0],      # Assume primary label is first
+                "count": record["relation_count"]        # Include the count of relations
             }
             for record in results
         ]
         return Response({"relations": relationship_types}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 @api_view(['POST'])
 def get_available_actions(request):
@@ -109,26 +112,114 @@ def get_available_actions(request):
     
 
 
+
+@api_view(['POST'])
+def get_virtual_relation_count(request):
+    # Get data from the request body
+    data = request.data
+    node_type = data.get('node_type')
+    node_id = data.get('node_id')
+    path = data.get('path')  # e.g., ['phone', 'call', 'phone']
+
+    # Validate input
+    if not node_type:
+        return Response(
+            {"error": "Missing required field: 'node_type'."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if not node_id:
+        return Response(
+            {"error": "Missing required field: 'node_id'."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if not path or not isinstance(path, list) or len(path) < 3 or len(path) % 2 == 0:
+        return Response(
+            {"error": "Invalid 'path': must be a non-empty list with odd length (alternating node labels and relationship types)."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        node_id = int(node_id)  # Ensure node_id is an integer
+    except (TypeError, ValueError):
+        return Response(
+            {"error": "'node_id' must be a valid integer."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Construct the Cypher query for the path
+    try:
+        # Initialize query components
+        nodes = []
+        relationships = []
+        for i, item in enumerate(path):
+            if i % 2 == 0:  # Node labels (e.g., 'phone')
+                nodes.append(item)
+            else:  # Relationship types (e.g., 'call')
+                relationships.append(item)
+
+        # Build the MATCH pattern
+        # e.g., for ['phone', 'call', 'phone']: MATCH (n0:phone)-[r0:call]->(n1:phone)
+        match_clauses = []
+        for i in range(len(nodes) - 1):
+            node_label = nodes[i]
+            next_node_label = nodes[i + 1]
+            rel_type = relationships[i]
+            match_clauses.append(f"(n{i}:{node_label})-[r{i}:{rel_type}]->(n{i+1}:{next_node_label})")
+
+        match_pattern = "-".join(match_clauses)
+        query = f"""
+        MATCH {match_pattern}
+        WHERE id(n0) = $node_id
+        RETURN COUNT(DISTINCT n1) AS total_count
+        """
+        print(query)
+        parameters = {"node_id": node_id}
+
+        # Run the query
+        results = run_query(query, parameters, database=settings.NEO4J_DATABASE)
+        total_count = results[0]["total_count"] if results else 0
+
+        return Response({"count": total_count}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 @api_view(['POST'])
 def add_action(request):
     try:
-        # Validate required fields
-        required_fields = ['name', 'description', 'node_type', 'id_field', 'query', 'node_id']
+        # Validate required fields except node_id (now optional)
+        required_fields = ['name', 'description', 'node_type', 'id_field', 'query']
         for field in required_fields:
             if field not in request.data:
                 return Response(
                     {"error": f"Missing required field: {field}"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-
+        print(request.data)
         new_action = {
             "name": request.data['name'],
-            "description": request.data['description'],  # Added description field
+            "description": request.data['description'],
             "node_type": request.data['node_type'],
             "id_field": request.data['id_field'],
             "query": request.data['query']
         }
-        node_id = request.data['node_id']
+
+        # Get node_id if provided, otherwise fetch a random one
+        node_id = request.data.get('node_id')
+        if not node_id:
+            try:
+                # Use a Cypher query to fetch a random node ID of the specified type
+                random_id_query = f"MATCH (n:{new_action['node_type']}) RETURN id(n) AS id LIMIT 1"
+                result = run_query(random_id_query)
+                if not result:
+                    return Response(
+                        {"error": f"No node found for type '{new_action['node_type']}'"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                node_id = result[0]['id']
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to fetch random node ID: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
         # Step 1: Test the Cypher query
         try:
@@ -137,7 +228,6 @@ def add_action(request):
             parameters = {id_field: int(node_id)}
             graph_data = parse_to_graph_with_transformer(query, parameters)
 
-            # Validate that the query returns nodes, relationships, or paths
             if not graph_data["nodes"] and not graph_data["edges"]:
                 return Response(
                     {"error": "Query did not return any nodes, relationships, or paths"},
@@ -174,11 +264,13 @@ def add_action(request):
             {"message": f"Action '{new_action['name']}' added successfully"},
             status=status.HTTP_201_CREATED
         )
+
     except Exception as e:
         return Response(
             {"error": f"Error adding action: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 @api_view(['POST'])
 def execute_action(request):
     # Get action name and node ID from request body

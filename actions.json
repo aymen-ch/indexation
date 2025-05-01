@@ -1,23 +1,23 @@
 [
   {
-    "name": "Show Criminal Network",
+    "name": "Afficher le reseau criminel",
     "node_type": "Personne",
     "id_field": "id",
     "query": "MATCH (context:Personne) WHERE id(context) = $id CALL apoc.path.expandConfig(context, { relationshipFilter: 'Proprietaire|Appel_telephone|Impliquer', minLevel: 1, maxLevel: 5 }) YIELD path WHERE last(nodes(path)):Affaire RETURN path",
-    "description": "Visualizes the criminal network connected to this person within 5 degrees of separation."
+    "description": "Affiche le reseau criminel lie a cette personne en explorant les relations menant aux affaires associees."
   },
   {
-    "name": "les affaire dans la meme commune",
+    "name": "Affaires dans la meme commune",
     "node_type": "Affaire",
     "id_field": "id",
     "query": "MATCH (context:Affaire)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune) WHERE id(context) = $id MATCH (c:Commune)-[:situer]-(u2:Unite)-[:Traiter]-(other:Affaire) RETURN other",
-    "description": "Finds all cases handled by police units located in the same commune as this case."
+    "description": "Recherche toutes les affaires traitees par la meme commune que celle de l'affaire selectionnee."
   },
   {
-    "name": "test",
+    "name": "Affaires a la meme date",
+    "description": "Identifie les autres affaires survenues a la meme date que l'affaire actuelle.",
     "node_type": "Affaire",
     "id_field": "id",
-    "query": "MATCH (context:Affaire) WHERE id(context) = $id match (other:Affaire) where id(other)<>  $id and other.date=context.date RETURN other",
-    "description": "Identifies other cases that occurred on the same date as this case.."
+    "query": "MATCH (context:Affaire) WHERE id(context) = $id match (other:Affaire) where id(other)<>  $id and other.date=context.date RETURN other"
   }
 ]
