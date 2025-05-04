@@ -436,7 +436,7 @@ def insert_node_attribute(request):
                 {"error": "aggregation must be 'sum' or 'multiplication'."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
+        attribute_name = f"_{attribute_name}"
         # Step 2: Verify if the node type exists
         label_query = """
         MATCH (n)
@@ -503,6 +503,50 @@ def insert_node_attribute(request):
                 "node_type": node_type,
                 "attribute_name": attribute_name,
                 "updated_nodes": updated_nodes
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+@api_view(['POST'])
+def get_relationship_properties(request):
+    try:
+        relationship_type = request.data.get('relationship_type')
+        if not relationship_type:
+            return Response(
+                {"error": "relationship_type is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch property keys for relationships of the given type
+        query = """
+        MATCH ()-[r]->()
+        WHERE type(r) = $relationship_type
+        RETURN DISTINCT keys(r) AS property_keys
+        LIMIT 1
+        """
+        params = {"relationship_type": relationship_type}
+        results = run_query(query, params, database=settings.NEO4J_DATABASE)
+
+        if not results:
+            return Response(
+                {"error": f"No relationships found with type '{relationship_type}'."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Extract property keys
+        property_keys = results[0]["property_keys"]
+
+        return Response(
+            {
+                "relationship_type": relationship_type,
+                "properties": property_keys
             },
             status=status.HTTP_200_OK
         )

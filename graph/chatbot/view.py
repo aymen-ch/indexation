@@ -71,16 +71,18 @@ def chatbot(request):
 
         # Generate the Cypher query using the LLM
         # formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
-        if selected_nodes:
-            # Use prompt with selected nodes if provided
-            prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
-        else:
-            if answer_type == 'graph':
-                prompt = simple_prompt_graph(question=question)
-            else:
-                prompt = simple_prompt_table(question=question)
-        cypher_response = call_ollama(prompt=prompt, model=modele)
-      
+        # if selected_nodes:
+        #     # Use prompt with selected nodes if provided
+        #     prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
+        # else:
+        #     if answer_type == 'graph':
+        #         prompt = simple_prompt_graph(question=question)
+        #     else:
+        #         prompt = simple_prompt_table(question=question)
+        # cypher_response = call_ollama(prompt=prompt, model=modele)
+        cypher_response="""
+MATCH (p:Personne)-[:Impliquer]-(a:Affaire {Number: 'Drog_24'}) RETURN p.`الاسم` AS `الاسم`, p.`اللقب` AS `اللقب`,p.`رقم التعريف الوطني` AS `رقم التعريف الوطني`
+"""
         # Extract the query between <Query> tags
         query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
         if query_match:

@@ -21,7 +21,6 @@ urlpatterns = [
     path('expand_path_from_node/', analyse_view.expand_path_from_node, name='expand_path_from_node'),
     path('get_attribute_values_for_node_type/', analyse_view.get_attribute_values_for_node_type, name='get_attribute_values_for_node_type'),
     path('get_relationship_types_for_node_type/', analyse_view.get_relationship_types_for_node_type, name='get_relationship_types_for_node_type'),
-
     ############################### aggregation ###################################  
     path('agregate/', view_aggregation.aggregate, name='agregate_context'),
     path('aggregatehria/', view_aggregation.aggregate_hira, name='aggre_hira'),
@@ -35,6 +34,7 @@ urlpatterns = [
     path('get_incoming_relationship_attributes/', view_detail.get_incoming_relationship_attributes, name='get_incoming_relationship_attributes'),
     path('insert_node_attribute/', view_detail.insert_node_attribute, name='insert_node_attribute'),
     path('get_node_properties/', view_detail.get_node_properties, name='get_node_properties'),
+    path('get_relationship_properties/', view_detail.get_relationship_properties, name='get_relationship_properties'),
     path('get_outgoing_relationship_attributes/', view_detail.get_outgoing_relationship_attributes, name='get_outgoing_relationship_attributes'),
     ############################### contextmenu expand + actions ###################################
     path('get_possible_relations/', view_contextmenu.get_possible_relations, name='get_possible_relations'),
@@ -45,6 +45,7 @@ urlpatterns = [
     path('get_available_actions/', view_contextmenu.get_available_actions, name='get_available_actions'),
     path('execute_action/', view_contextmenu.execute_action, name='execute_action'),
     path('add_action/', view_contextmenu.add_action, name='add_action'),
+    path('get_virtual_relation_count/', view_contextmenu.get_virtual_relation_count, name='get_virtual_relation_count'),
     #################################interrogation cible par type de node + rechreche #################################
     path('node-types/', view_intreogcible.get_node_types, name='get_node_types'),
     path('node-types/properties/', view_intreogcible.get_node_properties, name='get_node_properties'),

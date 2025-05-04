@@ -430,11 +430,10 @@ graph_generation_prompt = PromptTemplate(
     ),
     input_variables=["input_context"]
 )
-
-
 def simple_prompet_resume(context, question, cypher_query):
     prompt = f"""
 Using the provided context (result of the previous Cypher query), the original Arabic question, and the previous Cypher query, generate a resumed response for a Neo4j database.
+
 **Context:**
 <Context>
 {context}
@@ -461,21 +460,39 @@ Using the provided context (result of the previous Cypher query), the original A
     ...
   </Resume>
 
-**Example:**
-Given:
-- Question: ما هو رقم هاتف الشخص الذي لديه رقم التعريف الوطني 19454664525774
+**Examples:**
+
+**Example 1: Simple Case**
+- Question: ما هو رقم هاتف الشخص الذي لديه رقم التعريف الوطني 19454664525774؟
 - Cypher Query:
   MATCH (p:Phone {{num: '0774033106'}})-[:Appel_telephone]-(calledPhone:Phone)
   RETURN calledPhone.num AS أرقام_الهواتف_المنصل_بها
-- Context: {{'رقم_الهاتف': '0660838914'}}
+- Context: {{'أرقام_الهواتف_المنصل_بها': '0660838914'}}
+- Resumed Response:
+  <Resume>
+    الرقم المرتبط برقم التعريف الوطني المطلوب هو 0660838914
+  </Resume>
 
-The resumed response should be:
-<Resume>
-  الرقم المرتبط برقم التعريف الوطني المطلوب هو 0660838914، ويمكن من خلاله الوصول إلى الأرقام التي تم الاتصال بها باستخدام الاستعلام المذكور.
-</Resume>
+**Example 2: Complex Case**
+- Question: من هم الأشخاص المرتبطون بالشركة التي يعمل بها الشخص صاحب رقم التعريف الوطني 19454664525774، وما هي أدوارهم؟
+- Cypher Query:
+  MATCH (p:Person {{national_id: '19454664525774'}})-[:WORKS_FOR]->(c:Company)<-[:WORKS_FOR]-(colleague:Person)
+  RETURN colleague.name AS colleague_name, colleague.role AS colleague_role, c.name AS company_name
+- Context: [
+    {{'colleague_name': 'أحمد محمد', 'colleague_role': 'مدير مشروع', 'company_name': 'شركة تقنية'}},
+    {{'colleague_name': 'سارة علي', 'colleague_role': 'مهندس برمجيات', 'company_name': 'شركة تقنية'}},
+    {{'colleague_name': 'خالد حسن', 'colleague_role': 'محلل بيانات', 'company_name': 'شركة تقنية'}}
+  ]
+- Resumed Response:
+  <Resume>
+    الأشخاص المرتبطون بالشركة التي يعمل بها صاحب رقم التعريف الوطني 19454664525774 هم:
+    - أحمد محمد (مدير مشروع)
+    - سارة علي (مهندس برمجيات)
+    - خالد حسن (محلل بيانات)
+    في شركة تقنية.
+  </Resume>
 """
     return prompt
-
 
 
 
