@@ -21,6 +21,8 @@ urlpatterns = [
     path('expand_path_from_node/', analyse_view.expand_path_from_node, name='expand_path_from_node'),
     path('get_attribute_values_for_node_type/', analyse_view.get_attribute_values_for_node_type, name='get_attribute_values_for_node_type'),
     path('get_relationship_types_for_node_type/', analyse_view.get_relationship_types_for_node_type, name='get_relationship_types_for_node_type'),
+    path('get_relationship_numeric_properties/', analyse_view.get_relationship_numeric_properties, name='get_relationship_numeric_properties'),
+    path('calculate_centrality/', analyse_view.calculate_centrality, name='calculate_centrality'),
     ############################### aggregation ###################################  
     path('agregate/', view_aggregation.aggregate, name='agregate_context'),
     path('aggregatehria/', view_aggregation.aggregate_hira, name='aggre_hira'),
@@ -82,7 +84,7 @@ urlpatterns = [
     path('DashBoard_get_affaire_counts_by_wilaya/', view_dashboard.get_affaire_counts_by_wilaya_view, name='get_affaire_counts_by_wilaya_view'),
     path('DashBoard_get_affaire_counts_by_day/', view_dashboard.get_affaire_counts_by_day_view, name='get_affaire_counts_by_day_view'),
     path('DashBoard_get_top_unite_by_affaire_count/', view_dashboard.get_top_unite_by_affaire_count_view, name='get_top_unite_by_affaire_count_view'),
-    
+    path('DashBoard_get_relationship_type_counts/', view_dashboard.get_relationship_type_counts_view, name='get_relationship_type_counts'),
 
     ############################## style config  ####################################
     path('node-config/', style_view.get_node_config, name='node-config'),
