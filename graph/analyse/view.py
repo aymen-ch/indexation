@@ -1,25 +1,14 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-# from utility import *
-
-
-
-from graph.utility import run_query
-from django.http import JsonResponse
-
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from graph.utility import run_query  # Ensure this function runs Cypher queries
-
-from graph.utility_neo4j import parse_to_graph_with_transformer, run_query
-
-from ..utility   import driver
-
 from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.decorators import api_view
+
+from django.http import JsonResponse
 from django.conf import settings
+
+from ..utility import driver
+from graph.utility import run_query
+from graph.utility_neo4j import parse_to_graph_with_transformer
+
 
 
 
@@ -255,44 +244,7 @@ def get_relationship_types_for_node_type(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['GET'])
-def get_relationship_types_for_node_type(request):
-    """
-    API endpoint to get all relationship types where both start and end nodes are of the specified node type.
-    
-    Parameters:
-    - nodeType: The node type/label (e.g., 'Person', 'Phone')
-    
-    Returns:
-    - List of distinct relationship types connecting nodes of the specified type
-    """
-    node_type = request.query_params.get('nodeType')
-    
-    if not node_type:
-        return Response(
-            {"error": "nodeType parameter is required"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    try:
-        with driver.session(database=settings.NEO4J_DATABASE) as session:
-            # Query to get distinct relationship types where both nodes are of the specified type
-            query = f"""
-            MATCH (start:{node_type})-[r]->(end:{node_type})
-            RETURN DISTINCT type(r) AS relationship_type
-            """
-            
-            result = session.run(query)
-            relationship_types = [record["relationship_type"] for record in result]
 
-            return Response({
-                "node_type": node_type,
-                "relationship_types": relationship_types,
-                "count": len(relationship_types)
-            }, status=status.HTTP_200_OK)
-
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 def get_attribute_values_for_node_type(request):
@@ -351,275 +303,13 @@ def fetch_distinct_relations(request):
         return Response({"error": str(e)}, status=500)
     
 
-@api_view(['POST'])
-def Secteur_Activite(request):
-    query = """
-    // Match Personne nodes where 'soutien' is in their class array
-    MATCH (p:Personne)
-    WHERE 'soutien' IN p._class
-
-    // Iterate over each affiresoutin ID
-    WITH p, p._affiresoutin AS affaireIds
-    UNWIND affaireIds AS affaireId
-
-    // Match the Affaire, Unite, Commune, Daira, and Wilaya nodes
-    MATCH (affaire:Affaire {identity: affaireId})-[:Traiter]-(unite:Unite)-[:situer]-(comune:Commune)-[:appartient]-(daira:Daira)-[:appartient]-(wilaya:Wilaya)
-
-    // Collect nom_arabe values without redundancy
-    WITH p, 
-        collect(DISTINCT comune.nom_arabe) AS comuneActivite, 
-        collect(DISTINCT daira.nom_arabe) AS dairaActiviti, 
-        collect(DISTINCT wilaya.nom_arabe) AS wiliyaActiviti
-
-    // Empty the lists first, then set with new values
-    SET p._comune_Activite = [],    // Clear the list
-        p._daira_activiti = [],     // Clear the list
-        p._wiliya_Activiti = []     // Clear the list
-    SET p._comune_Activite = comuneActivite,
-        p._daira_activiti = dairaActiviti,
-        p._wiliya_Activiti = wiliyaActiviti
-"""
-    
-    try:
-        result = run_query(query)
-         # Return the result as a JSON response
-        return JsonResponse(result, safe=False)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-
-
-@api_view(['POST'])
-def Node_clasification(request):
-    # Extract templates and depth from the request
-    templates = request.data.get('templates', [])
-    depth = int(request.data.get('depth', 1))  # Default depth is 1
-
-    # Validate templates and depth
-    if not templates:
-        return JsonResponse({"error": "No templates provided."}, status=400)
-    if depth < 1:
-        return JsonResponse({"error": "Depth must be at least 1."}, status=400)
-
-    # Generate Part 1 queries for each template
-    part1_queries = []
-    for template in templates:
-        query = f"""
-        // Part 1: Create contactWithRelation relationships for template: {template}
-        MATCH {template}
-        WHERE p1 <> p2
-        WITH p1, p2
-        MERGE (p1)-[e:contactWithRelation]->(p2);
-        """
-        part1_queries.append(query)
-
-    # Generate Part 2 query dynamically based on depth
-    part2_query = """
-    // Part 2: Calculate _Lvl_of_Implications for each Personne node
-    MATCH (p:Personne)
-    OPTIONAL MATCH (p)-[r:Impliquer]-(:Affaire)  
-    WITH p, COUNT(r) AS num_affaires_LvL0
-    """
-
-    # Dynamically add levels based on depth
-    for level in range(1, depth):
-        part2_query += f"""
-        OPTIONAL MATCH (p)-[:contactWithRelation*{level}]-(p{level}:Personne)-[r{level}:Impliquer]-(:Affaire)
-        WITH p, {', '.join(f'num_affaires_LvL{i}' for i in range(level))}, COUNT(r{level}) AS num_affaires_LvL{level}
-        """
-
-    # Finalize Part 2 query
-    part2_query += f"""
-    SET p._Lvl_of_Implications = [{', '.join(f'num_affaires_LvL{i}' for i in range(depth ))}];
-    """
-
-    # Define the rest of the queries (Parts 3-7)
-    queries = part1_queries + [part2_query] + [
-        """
-        // Part 3: Initialize properties for all Personne nodes
-        MATCH (p:Personne)
-        SET p._class = ["neutre"],
-            p._affireOpretioneele = [],
-            p._affiresoutin = [],
-            p._affireleader = [];
-        """,
-        """
-        // Part 4: Assign "operationeel" to Personne nodes with _Lvl_of_Implications[0] > 0
-        MATCH (p:Personne)
-        WHERE "neutre" IN p._class AND p._Lvl_of_Implications[0] > 0
-        SET p._class = p._class + "operationeel"
-        WITH p
-        MATCH (p)-[:Impliquer]-(a:Affaire)
-        WITH p, COLLECT(a.identity) AS affaire_ids
-        SET p._affireOpretioneele = affaire_ids;
-        """,
-        """
-        // Part 5: Assign "soutien" to Personne nodes connected to "operationeel" nodes
-        MATCH (p1:Personne)-[:contactWithRelation]-(p2:Personne)
-        WHERE "operationeel" IN p1._class AND p2._Lvl_of_Implications[1] > p1._Lvl_of_Implications[0]
-        SET p2._class = CASE WHEN NOT "soutien" IN p2._class THEN p2._class + "soutien" ELSE p2._class END,
-            p2._affiresoutin = apoc.coll.toSet(p2._affiresoutin + p1._affireOpretioneele);
-        """,
-        f"""
-        WITH range(1, {depth - 1}) AS levels
-        UNWIND levels AS i
-        MATCH (p1:Personne)-[:contactWithRelation]-(p2:Personne)
-        WHERE "soutien" IN p1._class AND p2._Lvl_of_Implications[i+1] > p1._Lvl_of_Implications[i]
-        SET p2._class = CASE WHEN NOT "soutien" IN p2._class THEN p2._class + "soutien" ELSE p2._class END,
-            p2._affiresoutin = apoc.coll.toSet(p2._affiresoutin + p1._affiresoutin);
-        """,
-        # f"""
-        # // Part 6: Assign "leader" to Personne nodes that qualify
-        # WITH range({depth - 2}, {depth - 2}) AS leader_levels
-        # UNWIND leader_levels AS i
-        # MATCH (p1:Personne)
-        # WHERE "soutien" IN p1._class
-        # WITH p1, i,
-        #      ALL(p2 IN [(p1)-[:contactWithRelation]-(p2:Personne) | p2] 
-        #          WHERE p2._Lvl_of_Implications[i] < p1._Lvl_of_Implications[i+1]) AS level_leader
-        # WITH p1, COLLECT(level_leader) AS leader_flags
-        # WHERE ANY(flag IN leader_flags WHERE flag = true)
-        # SET p1._class = CASE WHEN NOT "leader" IN p1._class THEN p1._class + "leader" ELSE p1._class END,
-        #     p1._affireleader = p1._affiresoutin;
-        # """,
-        """
-        // Part 7: Delete all contactWithRelation relationships
-        MATCH (p1:Personne)-[r:contactWithRelation]-(p2:Personne)
-        DELETE r;
-        """
-    ]
-
-    # Execute each query sequentially
-    results = []
-    for query in queries:
-        print(query)
-        data = run_query(query)
-        results.append(data)
-
-    # Return the result as a JSON response
-    return JsonResponse(results, safe=False)
 
 
 
-@api_view(['POST'])
-def calculate_betweenness_centrality(request):
-    """
-    Calculate normalized betweenness centrality for Personne nodes.
-    Returns statistics about the calculation process.
-    """
-    try:
-        
 
-        # Step 1: Create temporary relationships
-        
-        query_part1 = """
-        MATCH (p1:Personne)-[:Impliquer]-(a:Affaire)-[:Impliquer]-(p2:Personne)
-        WHERE p1 <> p2
-        MERGE (p1)-[rel:contactWithAffaire {affaireId: a.identity}]-(p2);
-        """
-        run_query(query_part1)
 
-      
-        query_part2 = """
-        MATCH (p1:Personne)-[:Proprietaire]-(ph1:Phone)-[ap:Appel_telephone]->(ph2:Phone)-[:Proprietaire]-(p2:Personne)
-        WHERE p1 <> p2
-        MERGE (p1)-[e:contactWithPhone]-(p2);
-        """
-        run_query(query_part2)
 
-        # Step 2: Project the graph for GDS
-       
-        query_part3 = """
-        CALL gds.graph.project(
-            'predictionGraph',
-            {
-                Personne: {
-                    properties: []
-                }
-            },
-            {
-                contactWithAffaire: {  
-                    orientation: 'UNDIRECTED'
-                },
-                contactWithPhone: {  
-                    orientation: 'UNDIRECTED'
-                }
-            }
-        );
-        """
-        run_query(query_part3)
 
-        # Step 3: Calculate betweenness centrality
-       
-        query_part4 = """
-        CALL gds.betweenness.write(
-            'predictionGraph',
-            {
-                writeProperty: '_betweennessCentrality'
-            }
-        )
-        YIELD nodePropertiesWritten, computeMillis, writeMillis, centralityDistribution;
-        """
-        run_query(query_part4)
-
-        # Step 4: Calculate min-max normalized score
-      
-        query_part5 = """
-        MATCH (p:Personne)
-        WITH min(p._betweennessCentrality) AS minCentrality, 
-             max(p._betweennessCentrality) AS maxCentrality
-        MATCH (p:Personne)
-        SET p._betweennessCentrality = 
-            CASE 
-                WHEN maxCentrality = minCentrality THEN 0
-                ELSE (p._betweennessCentrality - minCentrality) / (maxCentrality - minCentrality)
-            END;
-        """
-        run_query(query_part5)
-
-        # Step 5: Delete temporary relationships
-       
-        query_part6 = """
-        MATCH (p1:Personne)-[rel:contactWithAffaire]-(p2:Personne)
-        DELETE rel;
-        """
-        run_query(query_part6)
-
-        query_part7 = """
-        MATCH (p1:Personne)-[rel:contactWithPhone]-(p2:Personne)
-        DELETE rel;
-        """
-        run_query(query_part7)
-
-        # Step 6: Clean up the projected graph
-      
-        query_part8 = """
-        CALL gds.graph.drop('predictionGraph') YIELD graphName;
-        """
-        run_query(query_part8)
-
-        # Return success response
-        response_data = {
-            "status": "success",
-            "message": "Betweenness centrality calculated and normalized successfully",
-        }
-       
-        return JsonResponse(response_data, status=200)
-
-    except Exception as e:
-       
-        return Response({
-            "status": "error",
-            "message": "Failed to calculate betweenness centrality",
-            "error": str(e)
-        }, status=500)
-
-    finally:
-        # Ensure the graph is dropped even if there's an error
-        try:
-         
-            run_query("CALL gds.graph.drop('predictionGraph') YIELD graphName;")
-        except Exception as e:
-            pass
 
 
 

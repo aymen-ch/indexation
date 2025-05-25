@@ -325,80 +325,10 @@ def execute_action(request):
             {"error": f"Error executing action: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-@api_view(['POST'])
-def personne_criminal_network(request):
-    # Get properties from request body
-    id = request.data.get('id', None)
-    
-
-    # Simplified Cypher query to return paths, letting the transformer handle the rest
-    query = """
-    MATCH (context:Personne {identity: $id})
-    CALL apoc.path.expandConfig(context, {
-      relationshipFilter: "Proprietaire|Appel_telephone|Impliquer",
-      minLevel: 1,
-      maxLevel: 5
-    })
-    YIELD path
-    WHERE last(nodes(path)):Affaire
-    RETURN path
-    """
-    
-    parameters = {'identity': id}
-    
-    try:
-        # Use the graph parser to process the result
-        graph_data = parse_to_graph_with_transformer(query, parameters)
-        
-        # If no nodes are returned, return an empty graph
-        if not graph_data["nodes"]:
-            return Response({"nodes": [], "edges": []}, status=status.HTTP_200_OK)
-        
-        return Response(graph_data, status=status.HTTP_200_OK)
-    
-    except Exception as e:
-        return Response(
-            {"error": f"Error executing query: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 
 
-@api_view(['POST'])
-def affaire_in_the_same_region(request):
-    # Get properties from request body
-    id = request.data.get('id', None)
-    print(request.data)
-    if not id:
-        return Response(
-            {"error": "Affaire ID is required"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
-    # Cypher query to find all Affaire nodes in the same Wilaya
-    query = """
-    MATCH (context:Affaire)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune)-[:appartient]-(d:Daira)-[:appartient]-(w:Wilaya) WHERE id(context) = $id
-    MATCH (w)-[:appartient]-(d2:Daira)-[:appartient]-(c2:Commune)-[:situer]-(u2:Unite)-[:Traiter]-(other:Affaire)
-    RETURN other
-    """
-
-    parameters = {'id': id}
-
-    try:
-        # Assuming parse_to_graph_with_transformer executes the query and transforms results into a graph format
-        graph_data = parse_to_graph_with_transformer(query, parameters)
-
-        # If no nodes are returned, return an empty graph
-        if not graph_data["nodes"]:
-            return Response({"nodes": [], "edges": []}, status=status.HTTP_200_OK)
-
-        return Response(graph_data, status=status.HTTP_200_OK)
-
-    except Exception as e:
-        return Response(
-            {"error": f"Error executing query: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 @api_view(['POST'])
 def get_node_relationships(request):
     print(request.data)

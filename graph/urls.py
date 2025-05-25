@@ -5,18 +5,17 @@ from .chatbot import view as vchat
 from .contextualization import view as context_view
 from .path import view as path_view
 from .analyse import view as analyse_view
-from .utility import *
+# from .utility import *
 from .sytle import view as style_view
 from .interrogation import view as view_intreogcible
 from .detail import view as view_detail
 from .contextmenu import view as view_contextmenu
 from .dashboard import view as view_dashboard
+from .dataBaseManagment import view as view_dataBaseManagment 
+
 urlpatterns = [
     ############################### Analysis ################################### 
-    path('Node_clasification/', analyse_view.Node_clasification, name='Node_clasification'),
     path('fetch_distinct_relations/', analyse_view.fetch_distinct_relations, name='fetch_distinct_relations'),
-    path('Secteur_Activite/', analyse_view.Secteur_Activite, name='Secteur_Activite'),
-    path('calculate_betweenness_centrality/', analyse_view.calculate_betweenness_centrality, name='calculate_betweenness_centrality'),
     path('analyse_fetch_nodes_by_range/', analyse_view.analyse_fetch_nodes_by_range, name='analyse_fetch_nodes_by_range'),
     path('expand_path_from_node/', analyse_view.expand_path_from_node, name='expand_path_from_node'),
     path('get_attribute_values_for_node_type/', analyse_view.get_attribute_values_for_node_type, name='get_attribute_values_for_node_type'),
@@ -25,9 +24,6 @@ urlpatterns = [
     path('calculate_centrality/', analyse_view.calculate_centrality, name='calculate_centrality'),
     ############################### aggregation ###################################  
     path('agregate/', view_aggregation.aggregate, name='agregate_context'),
-    path('aggregatehria/', view_aggregation.aggregate_hira, name='aggre_hira'),
-    path('aggregate_with_algo/', view_aggregation.aggregate_with_algo, name='aggregate_with_algo'),
-    path('ExpandAggregation/', view_aggregation.ExpandAggregation, name='ExpandAggregation'),
     ################################# details #################################
     path('getdata/', view_detail.getdata, name='getdata'),
     path('getrelationData/', view_detail.getrelationData, name='getrelationData'),
@@ -41,9 +37,7 @@ urlpatterns = [
     ############################### contextmenu expand + actions ###################################
     path('get_possible_relations/', view_contextmenu.get_possible_relations, name='get_possible_relations'),
     path('get_node_relationships/', view_contextmenu.get_node_relationships, name='get_node_relationships'),
-    path('personne_criminal_network/', view_contextmenu.personne_criminal_network, name='personne_criminal_network'),
     path('get_virtual_relationships/', view_contextmenu.get_virtual_relationships, name='get_virtual_relationships'),
-    path('affaire_in_the_same_region/', view_contextmenu.affaire_in_the_same_region, name='affaire_in_the_same_region'),
     path('get_available_actions/', view_contextmenu.get_available_actions, name='get_available_actions'),
     path('execute_action/', view_contextmenu.execute_action, name='execute_action'),
     path('add_action/', view_contextmenu.add_action, name='add_action'),
@@ -70,13 +64,13 @@ urlpatterns = [
     path('get_all_connections_subgraphe/', path_view.get_all_connections2, name='get_all_connections2'),
     path('shortestpath/', path_view.shortestpath, name='shortestpath'),
     ############################## Data Base Managment  ####################################
-    path('list_all_databases/', list_all_databases_view, name='list_all_databases_view'),
-    path('get_current_database/', get_current_database_view, name='get_current_database_view'),
-    path('delete_database/', delete_database_view, name='delete_database_view'),
-    path('create_new_database/', create_new_database_view, name='create_new_database_view'),
-    path('change_current_database/', change_current_database_view, name='change_current_database_view'),
-    path('import_file_to_neo4j/', import_file_to_neo4j_view, name='import_file_to_neo4j_view'),
-    path('database_stats/', get_database_stats_view, name='get_database_stats_view'),
+    path('list_all_databases/', view_dataBaseManagment.list_all_databases_view, name='list_all_databases_view'),
+    path('get_current_database/', view_dataBaseManagment.get_current_database_view, name='get_current_database_view'),
+    path('delete_database/', view_dataBaseManagment.delete_database_view, name='delete_database_view'),
+    path('create_new_database/', view_dataBaseManagment.create_new_database_view, name='create_new_database_view'),
+    path('change_current_database/', view_dataBaseManagment.change_current_database_view, name='change_current_database_view'),
+    path('import_file_to_neo4j/', view_dataBaseManagment.import_file_to_neo4j_view, name='import_file_to_neo4j_view'),
+    path('database_stats/', view_dataBaseManagment.get_database_stats_view, name='get_database_stats_view'),
 
     ############################## DashBoard   ####################################
     path('DashBoard_database_stats/', view_dashboard.get_database_stats_view, name='get_database_stats_view'),
