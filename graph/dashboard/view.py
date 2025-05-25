@@ -40,6 +40,31 @@ def get_database_stats_view(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 
+@api_view(['GET'])
+def get_relationship_type_counts_view(request):
+    """
+    API endpoint to get the count of relationships for each relationship type.
+    GET request, no parameters required.
+    """
+    try:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
+            # Query to get count of relationships per type
+            query = """
+            MATCH ()-[r]->()
+            RETURN type(r) AS relationship_type, COUNT(*) AS count
+            ORDER BY relationship_type
+            """
+            
+            result = session.run(query)
+            relationship_type_counts = {record["relationship_type"]: record["count"] for record in result}
+
+            return Response({
+                "relationship_type_counts": relationship_type_counts
+            }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['GET'])
 def get_node_type_counts_view(request):
