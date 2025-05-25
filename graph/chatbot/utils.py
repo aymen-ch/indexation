@@ -101,11 +101,9 @@ You are a Neo4j expert tasked with converting Arabic questions into Cypher queri
 <Schema>
 {schema_description}
 </Schema>
-
 **Input:**
 - The question is in Arabic, requesting a table response .
 - No specific nodes are selected; queries should apply broadly or as inferred from the question.
-
 **Rules:**
 1. Use node aliases (e.g., `(p:Personne)`).
 2. Adhere strictly to the schema: only use defined node labels, properties, and relationship types.
@@ -113,7 +111,6 @@ You are a Neo4j expert tasked with converting Arabic questions into Cypher queri
 4. Always use meaningful Arabic aliases for the returned properties (e.g., `p.name AS الاسم`, `COUNT(p) AS عدد_الأشخاص`).
 5. **Do not add any explanation, notes, or additional text under any circumstances.**
 6. **Output only the Cypher query** in the specified format.
-
 **Response Type Handling:**
 - **Table Response**:
   - Return a tabular result with properties or aggregations.
@@ -151,6 +148,72 @@ You are a Neo4j expert tasked with converting Arabic questions into Cypher queri
 """
     return prompt
 
+
+def cypher_prompt_graph(question, node_type):
+    prompt = f"""
+You are a Neo4j expert tasked with generating Cypher queries for a Neo4j database based on a natural language question, a specified node type, and a provided schema. The query should return nodes, relationships, or paths as appropriate for the question, ensuring compatibility with the schema.
+
+**Database Schema:**
+<Schema>
+{schema_description}
+</Schema>
+
+**Input:**
+- Node Type: {node_type}
+- Question: {question}
+- The question is in natural language (e.g., English or Arabic) and requests a specific query response.
+- The query should focus on the specified node type and its relationships or properties.
+
+**Rules:**
+1. Use node aliases (e.g., `(n:{node_type})`).
+2. Adhere strictly to the schema: only use defined node labels, properties, and relationship types.
+3. Analyze the question to map nodes, relationships, and properties accurately.
+4. Use `$id` to reference the ID of the context node when filtering by ID.
+5. If the question is in Arabic, translate it mentally to English to understand its intent.
+6. **Do not add any explanation, notes, or additional text.**
+7. **Output only the Cypher query** in the specified format.
+
+**Response Type Handling:**
+- Return nodes, relationships, or paths based on the question’s intent.
+- Example 1:
+  <Node Type>
+    Affaire
+  </Node Type>
+  <Question>
+    Identify other cases that occurred on the same date as the current case.
+  </Question>
+  <Query>
+    MATCH (context:Affaire) WHERE id(context) = $id MATCH (other:Affaire) WHERE id(other) <> $id AND other.date = context.date RETURN other
+  </Query>
+- Example 2:
+  <Node Type>
+    Personne
+  </Node Type>
+  <Question>
+    What are the phone calls for a person?
+  </Question>
+  <Query>
+    MATCH path=(n:Personne)-[:Proprietaire]->(ph:Phone)-[:Appel_telephone]->()
+    RETURN path
+  </Query>
+
+**Output Requirements:**
+- Return **only the Cypher query** in this exact format:
+  <Query>
+    ...
+  </Query>
+
+**Node Type:**
+<Node Type>
+{node_type}
+</Node Type>
+
+**Question:**
+<Question>
+{question}
+</Question>
+"""
+    return prompt
 def simple_prompt_graph(question):
     prompt = f"""
 You are a Neo4j expert tasked with converting Arabic questions into Cypher queries for a Neo4j database. The user requests a graph response, meaning the query should return the full path of relationships and nodes. Translate the Arabic question mentally into English to understand its intent and map it to the provided English schema.
@@ -432,7 +495,8 @@ graph_generation_prompt = PromptTemplate(
 )
 def simple_prompet_resume(context, question, cypher_query):
     prompt = f"""
-Using the provided context (result of the previous Cypher query), the original Arabic question, and the previous Cypher query, generate a resumed response for a Neo4j database.
+Using the provided context (result of the Neo4j Cypher query), the original Arabic question (which the result answers), and the Neo4j Cypher query,
+generate a concise and natural-language summary of the result.
 
 **Context:**
 <Context>
@@ -450,11 +514,11 @@ Using the provided context (result of the previous Cypher query), the original A
 </Cypher>
 
 **Rules:**
-1. Analyze the context, question, and previous Cypher query to generate a meaningful continuation of the response.
+1. Analyze the context, question, and Cypher query to generate a meaningful and accurate response.
 2. **Output only the resumed response** in the specified format.
-3. The resumed response should be a natural continuation or enhancement of the previous result, potentially refining the query or summarizing the context in a user-friendly way.
+3. The resumed response should be a natural continuation or summarization of the result, user-friendly, and informative.
 
-**Output Requirements:**
+**Output Format:**
 - Return **only the resumed response** in this exact format:
   <Resume>
     ...
@@ -472,27 +536,9 @@ Using the provided context (result of the previous Cypher query), the original A
   <Resume>
     الرقم المرتبط برقم التعريف الوطني المطلوب هو 0660838914
   </Resume>
-
-**Example 2: Complex Case**
-- Question: من هم الأشخاص المرتبطون بالشركة التي يعمل بها الشخص صاحب رقم التعريف الوطني 19454664525774، وما هي أدوارهم؟
-- Cypher Query:
-  MATCH (p:Person {{national_id: '19454664525774'}})-[:WORKS_FOR]->(c:Company)<-[:WORKS_FOR]-(colleague:Person)
-  RETURN colleague.name AS colleague_name, colleague.role AS colleague_role, c.name AS company_name
-- Context: [
-    {{'colleague_name': 'أحمد محمد', 'colleague_role': 'مدير مشروع', 'company_name': 'شركة تقنية'}},
-    {{'colleague_name': 'سارة علي', 'colleague_role': 'مهندس برمجيات', 'company_name': 'شركة تقنية'}},
-    {{'colleague_name': 'خالد حسن', 'colleague_role': 'محلل بيانات', 'company_name': 'شركة تقنية'}}
-  ]
-- Resumed Response:
-  <Resume>
-    الأشخاص المرتبطون بالشركة التي يعمل بها صاحب رقم التعريف الوطني 19454664525774 هم:
-    - أحمد محمد (مدير مشروع)
-    - سارة علي (مهندس برمجيات)
-    - خالد حسن (محلل بيانات)
-    في شركة تقنية.
-  </Resume>
 """
     return prompt
+
 
 
 

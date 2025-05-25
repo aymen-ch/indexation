@@ -63,6 +63,7 @@ urlpatterns = [
     path('chatbot/', vchat.chatbot, name='chat'),
     path('run/', vchat.execute_query, name='execute_query'),
     path('chatbot/resume/', vchat.chatbot_resume, name='chatbot_resume'),
+    path('generate_cypher/', vchat.chatbot_action, name='action'),
     ############################## path ####################################
     path('get_all_connections/', path_view.get_all_connections4, name='get_all_connections'),
     path('get_all_connections_subgraphe/', path_view.get_all_connections2, name='get_all_connections2'),
@@ -87,6 +88,7 @@ urlpatterns = [
     ############################## style config  ####################################
     path('node-config/', style_view.get_node_config, name='node-config'),
     path('update-node-config/', style_view.update_node_config, name='update-node-config'),
+     
 
 ]
 

@@ -1,12 +1,15 @@
-# node_config/views.py
 import json
 import os
+import uuid
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 
 CONFIG_FILE = os.path.join(settings.BASE_DIR, 'config_style.json')
+
+# Ensure visualizations directory exists
+
 
 @api_view(['GET'])
 def get_node_config(request):

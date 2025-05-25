@@ -499,7 +499,7 @@ def insert_node_attribute(request):
         # Step 5: Return success message
         return Response(
             {
-                "message": f"Successfully updated {updated_nodes} nodes of type '{node_type}' with attribute '{attribute_name}'.",
+                "message": f"Mise à jour réussie de {updated_nodes} nœuds de type '{node_type}' avec l’attribut '{attribute_name}'.",
                 "node_type": node_type,
                 "attribute_name": attribute_name,
                 "updated_nodes": updated_nodes

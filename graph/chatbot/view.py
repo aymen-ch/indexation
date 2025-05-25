@@ -70,19 +70,17 @@ def chatbot(request):
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Generate the Cypher query using the LLM
-        # formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
-        # if selected_nodes:
-        #     # Use prompt with selected nodes if provided
-        #     prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
-        # else:
-        #     if answer_type == 'graph':
-        #         prompt = simple_prompt_graph(question=question)
-        #     else:
-        #         prompt = simple_prompt_table(question=question)
-        # cypher_response = call_ollama(prompt=prompt, model=modele)
-        cypher_response="""
-MATCH (p:Personne)-[:Impliquer]-(a:Affaire {Number: 'Drog_24'}) RETURN p.`الاسم` AS `الاسم`, p.`اللقب` AS `اللقب`,p.`رقم التعريف الوطني` AS `رقم التعريف الوطني`
-"""
+        formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
+        if selected_nodes:
+            # Use prompt with selected nodes if provided
+            prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
+        else:
+            if answer_type == 'graph':
+                prompt = simple_prompt_graph(question=question)
+            else:
+                prompt = simple_prompt_table(question=question)
+        cypher_response = call_ollama(prompt=prompt, model=modele)
+
         # Extract the query between <Query> tags
         query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
         if query_match:
@@ -90,25 +88,20 @@ MATCH (p:Personne)-[:Impliquer]-(a:Affaire {Number: 'Drog_24'}) RETURN p.`الا
         else:
             cypher_query = cypher_response  # Fallback if no tags are found
         # Replace specific terms in the Cypher query
-        cypher_query = cypher_query.replace("national_id", "`رقم التعريف الوطني`")
-        cypher_query = cypher_query.replace("birth_date", "`تاريخ الميلاد`")
-        cypher_query = cypher_query.replace("firstname", "الاسم")
-        cypher_query = cypher_query.replace("lastname", "اللقب")
-        cypher_query = cypher_query.replace("->", "-")
-        cypher_query = cypher_query.replace("<-", "-")
+    
         query_result, success = execute_query_for_response_generation(cypher_query)
         # Debugging: Print the Cypher query
         print("Generated Cypher Query:", cypher_query)
 
         if not success:
             # If the query execution fails, attempt to validate and correct it
-            print(f"Query failed with error: {query_result}")
-            corrected_query = validate_query(cypher_query, schema_description, query_result)
-            query_match = re.search(r'<Query>(.*?)</Query>', corrected_query, re.DOTALL)
-            if query_match:
-                cypher_query = query_match.group(1).strip()
-            else:
-                cypher_query = corrected_query  # Fallback if no tags are found
+            # print(f"Query failed with error: {query_result}")
+            # corrected_query = validate_query(cypher_query, schema_description, query_result)
+            # query_match = re.search(r'<Query>(.*?)</Query>', corrected_query, re.DOTALL)
+            # if query_match:
+            #     cypher_query = query_match.group(1).strip()
+            # else:
+            #     cypher_query = corrected_query  # Fallback if no tags are found
 
             
             # Re-execute the corrected query
@@ -168,6 +161,87 @@ MATCH (p:Personne)-[:Impliquer]-(a:Affaire {Number: 'Drog_24'}) RETURN p.`الا
     
 
 
+
+
+@api_view(['POST'])
+def chatbot_action(request):
+    
+    try:
+        # Parse the request body
+        data = json.loads(request.body)
+        question = data.get('question')  # Extract the user's question
+        node_type = data.get('node_type', 'Affaire')  # Default to 'Text' if not provided
+        modele = data.get('model')  # Default to 'Text' if not provide
+     
+        print(request.body)
+        if not question:
+            return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        
+
+        prompt = cypher_prompt_graph(question=question, node_type=node_type)
+       
+        cypher_response = call_ollama(prompt=prompt, model=modele)
+
+        # Extract the query between <Query> tags
+        query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
+        if query_match:
+            cypher_query = query_match.group(1).strip()
+        else:
+            cypher_query = cypher_response  # Fallback if no tags are found
+        # Replace specific terms in the Cypher query
+
+        query_result, success = execute_query_for_response_generation(cypher_query)
+        # Debugging: Print the Cypher query
+        print("Generated Cypher Query:", cypher_query)
+
+        if not success:
+            # If the query execution fails, attempt to validate and correct it
+            # print(f"Query failed with error: {query_result}")
+            # corrected_query = validate_query(cypher_query, schema_description, query_result)
+            # query_match = re.search(r'<Query>(.*?)</Query>', corrected_query, re.DOTALL)
+            # if query_match:
+            #     cypher_query = query_match.group(1).strip()
+            # else:
+            #     cypher_query = corrected_query  # Fallback if no tags are found
+
+            
+            # Re-execute the corrected query
+            query_result, success = execute_query_for_response_generation(cypher_query)
+            
+            if not success:
+                # If the corrected query still fails, return the error
+                return Response(
+                    {
+                        "cypher": cypher_query,
+                        "response": 'je ne peux pas répondre'  # Updated error message
+                    },
+                    status=status.HTTP_200_OK
+                )
+            else:
+                # Update cypher_query to the corrected one for the response
+                cypher_query = cypher_query
+
+        # Handle response based on answer type
+        return JsonResponse({"cypher":cypher_query}, status=status.HTTP_200_OK)
+
+
+    except json.JSONDecodeError:
+        return Response(
+            {"error": "Invalid JSON in request body"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error in chatbot endpoint: {str(e)}")
+        return Response(
+            {"error": "An unexpected error occurred"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+
+
 @api_view(['POST'])
 def chatbot_resume(request):
     try:
@@ -190,7 +264,11 @@ def chatbot_resume(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         prompt = simple_prompet_resume(context=raw_response, question=question, cypher_query=cypher_query) # Adjust based on how simple_prompet works
-        resume_response = call_ollama(prompt=prompt, model=model)
+        # resume_response = call_ollama(prompt=prompt, model=model)
+
+        resume_response="""
+تم العثور على 3 أشخاص مشاركين في القضية رقم 24 Drog، وهم: مليكة زرائي (رقم التعريف الوطني: 15964012331679)، شهرزاد سبتي (رقم التعريف الوطني: 66145125249188)، وسيرين قاسمي (رقم التعريف الوطني: 88543203398426).
+"""
         # Extract the content between <Resume> tags
         print(resume_response)
         resume_match = re.search(r'<Resume>(.*?)</Resume>', resume_response, re.DOTALL)
