@@ -27,6 +27,6 @@
     "color": "#CCCCCC",
     "size": 90,
     "icon": "/icon/default.png",
-    "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
+    "labelKey": "identity"
   }
 }
