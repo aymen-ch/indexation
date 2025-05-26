@@ -1,0 +1,24 @@
+[
+  {
+    "name": "hihi",
+    "path": [
+      "Personne",
+      "Proprietaire",
+      "Phone",
+      "Appel_telephone",
+      "Phone",
+      "Proprietaire",
+      "Personne"
+    ]
+  },
+  {
+    "name": "oo",
+    "path": [
+      "Personne",
+      "Proprietaire",
+      "Phone",
+      "Appel_telephone",
+      "Phone"
+    ]
+  }
+]

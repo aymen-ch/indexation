@@ -5,7 +5,7 @@ from .chatbot import view as vchat
 from .contextualization import view as context_view
 from .path import view as path_view
 from .analyse import view as analyse_view
-# from .utility import *
+
 from .sytle import view as style_view
 from .interrogation import view as view_intreogcible
 from .detail import view as view_detail
@@ -38,9 +38,8 @@ urlpatterns = [
     path('get_possible_relations/', view_contextmenu.get_possible_relations, name='get_possible_relations'),
     path('get_node_relationships/', view_contextmenu.get_node_relationships, name='get_node_relationships'),
     path('get_virtual_relationships/', view_contextmenu.get_virtual_relationships, name='get_virtual_relationships'),
-    path('get_available_actions/', view_contextmenu.get_available_actions, name='get_available_actions'),
     path('execute_action/', view_contextmenu.execute_action, name='execute_action'),
-    path('add_action/', view_contextmenu.add_action, name='add_action'),
+    
     path('get_virtual_relation_count/', view_contextmenu.get_virtual_relation_count, name='get_virtual_relation_count'),
     #################################interrogation cible par type de node + rechreche #################################
     path('node-types/', view_intreogcible.get_node_types, name='get_node_types'),
@@ -84,8 +83,12 @@ urlpatterns = [
     ############################## style config  ####################################
     path('node-config/', style_view.get_node_config, name='node-config'),
     path('update-node-config/', style_view.update_node_config, name='update-node-config'),
-     
-
+    path('add_action/', style_view.add_action, name='add_action'),
+    path('get_available_actions/', style_view.get_actions_by_node_type, name='get_available_actions'),
+    path('get_predefined_questions/', style_view.get_predefined_questions, name='get_predefined_questions'),
+    path('add_predefined_question/', style_view.add_predefined_question, name='add_predefined_question'),
+    path('add_aggregation/', style_view.add_aggregation, name='add_aggregation'),
+    path('get_aggregations/', style_view.get_aggregations, name='get_aggregations'),
 ]
 
 

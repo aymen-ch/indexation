@@ -70,7 +70,6 @@ def chatbot(request):
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Generate the Cypher query using the LLM
-        formatted_prompt = few_shot_prompt.format(question=question, schema_description=schema_description)
         if selected_nodes:
             # Use prompt with selected nodes if provided
             prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
@@ -264,13 +263,9 @@ def chatbot_resume(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         prompt = simple_prompet_resume(context=raw_response, question=question, cypher_query=cypher_query) # Adjust based on how simple_prompet works
-        # resume_response = call_ollama(prompt=prompt, model=model)
+        resume_response = call_ollama(prompt=prompt, model=model)
 
-        resume_response="""
-تم العثور على 3 أشخاص مشاركين في القضية رقم 24 Drog، وهم: مليكة زرائي (رقم التعريف الوطني: 15964012331679)، شهرزاد سبتي (رقم التعريف الوطني: 66145125249188)، وسيرين قاسمي (رقم التعريف الوطني: 88543203398426).
-"""
         # Extract the content between <Resume> tags
-        print(resume_response)
         resume_match = re.search(r'<Resume>(.*?)</Resume>', resume_response, re.DOTALL)
         if resume_match:
             resumed_content = resume_match.group(1).strip()

@@ -63,52 +63,7 @@ def get_possible_relations(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['POST'])
-def get_available_actions(request):
-    # Get node type from request body
-    node_type = request.data.get('node_type', None)
-   
-    if not node_type:
-        return Response(
-            {"error": "Node type is required"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
-    try:
-        # Path to the actions configuration file
-        with open(CONFIG_FILE, 'r') as file:
-            actions_config = json.load(file)
-
-        # Filter actions by node type and include all relevant fields
-        available_actions = [
-            {
-                "id": action.get("id"),  # Include if available
-                "name": action["name"],
-                "node_type": action["node_type"],
-                # "id_field": action.get("id_field", "id"),  # Default to 'id' if not specified
-                "query": action["query"],
-                "description": action["description"],  # Include if available
-                # "created_at": action.get("created_at"),  # Include if available
-                # "created_by": action.get("created_by")  # Include if available
-            }
-            for action in actions_config
-            if action["node_type"] == node_type
-        ]
-
-        return Response({"actions": available_actions}, status=status.HTTP_200_OK)
-
-    except FileNotFoundError:
-        print("Actions configuration file not found")
-        return Response(
-            {"error": "Actions configuration file not found"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-    except Exception as e:
-        print(e)
-        return Response(
-            {"error": f"Error reading actions configuration: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
     
 
 
@@ -182,6 +137,7 @@ def get_virtual_relation_count(request):
         return Response({"count": total_count}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 @api_view(['POST'])
 def add_action(request):
     try:

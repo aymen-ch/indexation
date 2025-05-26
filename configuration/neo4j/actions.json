@@ -19,5 +19,19 @@
     "node_type": "Affaire",
     "id_field": "id",
     "query": "MATCH (context:Affaire) WHERE id(context) = $id match (other:Affaire) where id(other)<>  $id and other.date=context.date RETURN other"
+  },
+  {
+    "name": "sss",
+    "description": "ggg",
+    "node_type": "Affaire",
+    "id_field": "id",
+    "query": "MATCH (context:Affaire)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune) WHERE id(context) = $id MATCH (c:Commune)-[:situer]-(u2:Unite)-[:Traiter]-(other:Affaire) RETURN other"
+  },
+  {
+    "name": "sss33",
+    "description": "ff",
+    "node_type": "Affaire",
+    "id_field": "id",
+    "query": "MATCH (context:Affaire)-[:Traiter]-(u:Unite)-[:situer]-(c:Commune) WHERE id(context) = $id MATCH (c:Commune)-[:situer]-(u2:Unite)-[:Traiter]-(other:Affaire) RETURN other"
   }
 ]
