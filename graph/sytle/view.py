@@ -181,8 +181,8 @@ def update_node_config(request):
     try:
         database_name = settings.NEO4J_DATABASE
         ensure_db_config_files(database_name)
-        config_file = get_db_config_path(database_name) / 'config.json'
-
+        config_file = get_db_config_path(database_name) / 'config_style.json'
+        print(config_file)
         node_type = request.data.get('nodeType')
         config = request.data.get('config', {})
 
@@ -215,6 +215,7 @@ def update_node_config(request):
         if 'icon' in config:
             node_config['nodeTypes'][node_type]['icon'] = config['icon']
         if 'labelKey' in config:
+            
             node_config['nodeTypes'][node_type]['labelKey'] = config['labelKey']
 
         # Write updated config

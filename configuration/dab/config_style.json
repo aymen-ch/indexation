@@ -27,36 +27,14 @@
     "color": "#CCCCCC",
     "size": 90,
     "icon": "/icon/default.png",
-    "labelKey": "identity"
+    "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
   },
   "nodeTypes": {
-    "Virtuel": {
-      "color": "#2689ba",
-      "size": 140,
-      "icon": "/icon/virtuel.png",
-      "labelKey": "Type,Nom"
-    },
     "DAB": {
       "color": "#CCCCCC",
       "size": 90,
       "icon": "/icon/default.png",
       "labelKey": "identity"
-    },
-    "Affaire": {
-      "color": "#D20103",
-      "size": 120,
-      "icon": "/icon/affaire.png",
-      "labelKey": "Number"
-    },
-    "Wilaya": {
-      "color": "#a62bb6",
-      "size": 120,
-      "icon": "/icon/wilaya.png"
-    },
-    "Daira": {
-      "color": "#49f41a",
-      "size": 120,
-      "icon": "/icon/daira.png"
     }
   }
 }
