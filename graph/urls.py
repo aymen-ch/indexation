@@ -61,7 +61,7 @@ urlpatterns = [
     path('generate_cypher/', vchat.chatbot_action, name='action'),
     ############################## path ####################################
     path('get_all_connections/', path_view.get_all_connections4, name='get_all_connections'),
-    path('get_all_connections_subgraphe/', path_view.get_all_connections2, name='get_all_connections2'),
+    # path('get_all_connections_subgraphe/', path_view.get_all_connections2, name='get_all_connections2'),
     path('shortestpath/', path_view.shortestpath, name='shortestpath'),
     ############################## Data Base Managment  ####################################
     path('list_all_databases/', view_dataBaseManagment.list_all_databases_view, name='list_all_databases_view'),
