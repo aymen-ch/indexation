@@ -23,7 +23,8 @@ def ensure_db_config_files(database_name):
     
     # Default configuration files
     config_files = {
-        'config_style.json': {"defaultNodeSize": 90,
+        'config_style.json':{
+  "defaultNodeSize": 90,
   "groupNodeSize": 70,
   "defaultNodeWidth": "200px",
   "defaultNodeHeight": "200px",
@@ -47,14 +48,16 @@ def ensure_db_config_files(database_name):
   "captionPadding": "5px",
   "captionBorderRadius": "3px",
   "captionTextShadow": "1px 1px 2px #000",
+
+  "nodeTypes": {
     "default": {
-      "color": "#CCCCCC",
-      "size": 90,
-      "icon": "/icon/default.png",
-      "labelKey": "identity,incoming_links,outgoing_links,sum_incoming_values,sum_outgoing_values"
-    }
-  
-  },
+    "color": "#CCCCCC",
+    "size": 90,
+    "icon": "/icon/default.png",
+    "labelKey": "identity"
+  }
+  }
+},
         'actions.json': [],
         'aggregation.json': [],
         'questions.json': []
@@ -164,7 +167,7 @@ def get_node_config(request):
     try:
         database_name = settings.NEO4J_DATABASE
         ensure_db_config_files(database_name)
-        config_file = get_db_config_path(database_name) / 'config.json'
+        config_file = get_db_config_path(database_name) / 'config_style.json'
 
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
