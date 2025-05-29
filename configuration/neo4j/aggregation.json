@@ -20,5 +20,19 @@
       "Appel_telephone",
       "Phone"
     ]
+  },
+  {
+    "name": "test",
+    "path": [
+      "Commune",
+      "situer",
+      "Unite",
+      "Traiter",
+      "Affaire",
+      "Impliquer",
+      "Personne",
+      "Proprietaire",
+      "Virtuel"
+    ]
   }
 ]
