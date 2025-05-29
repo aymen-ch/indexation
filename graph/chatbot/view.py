@@ -35,25 +35,7 @@ def execute_query(request):
         return JsonResponse({'error': str(e)}, status=500)
     
 import re
-def validate_query(generated_query, schema_description, error):
-    validation_prompt = f"""
-Given the following Neo4j database schema:
-{schema_description}
 
-And the following Cypher query:
-{generated_query}
-and the error given by Neo4j:
-{error}
-
-Please correct the query to avoid the error and return only the corrected Cypher query without any explanation  in this format
-
-<Query>
-   ....
-</Query>
-.
-"""
-    response = call_ollama(validation_prompt, model="hf.co/DavidLanz/text2cypher-gemma-2-9b-it-finetuned-2024v1:latest")
-    return response.strip()
 
 @api_view(['POST'])
 def chatbot(request):
@@ -72,12 +54,12 @@ def chatbot(request):
         # Generate the Cypher query using the LLM
         if selected_nodes:
             # Use prompt with selected nodes if provided
-            prompt = simple_prompt_with_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
+            prompt = simple_prompt_with_selected_nodes(question=question, type=answer_type, selected_nodes=selected_nodes)
         else:
             if answer_type == 'graph':
-                prompt = simple_prompt_graph(question=question)
+                prompt = prompt_graph_query(question=question)
             else:
-                prompt = simple_prompt_table(question=question)
+                prompt = prompt_table_query(question=question)
         cypher_response = call_ollama(prompt=prompt, model=modele)
 
         # Extract the query between <Query> tags
@@ -93,16 +75,6 @@ def chatbot(request):
         print("Generated Cypher Query:", cypher_query)
 
         if not success:
-            # If the query execution fails, attempt to validate and correct it
-            # print(f"Query failed with error: {query_result}")
-            # corrected_query = validate_query(cypher_query, schema_description, query_result)
-            # query_match = re.search(r'<Query>(.*?)</Query>', corrected_query, re.DOTALL)
-            # if query_match:
-            #     cypher_query = query_match.group(1).strip()
-            # else:
-            #     cypher_query = corrected_query  # Fallback if no tags are found
-
-            
             # Re-execute the corrected query
             query_result, success = execute_query_for_response_generation(cypher_query)
             
@@ -158,13 +130,8 @@ def chatbot(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
-
-
-
-
 @api_view(['POST'])
-def chatbot_action(request):
-    
+def chatbot_generate_action(request):
     try:
         # Parse the request body
         data = json.loads(request.body)
@@ -178,7 +145,7 @@ def chatbot_action(request):
         
         
 
-        prompt = cypher_prompt_graph(question=question, node_type=node_type)
+        prompt = cypher_promp_action(question=question, node_type=node_type)
        
         cypher_response = call_ollama(prompt=prompt, model=modele)
 
@@ -195,16 +162,6 @@ def chatbot_action(request):
         print("Generated Cypher Query:", cypher_query)
 
         if not success:
-            # If the query execution fails, attempt to validate and correct it
-            # print(f"Query failed with error: {query_result}")
-            # corrected_query = validate_query(cypher_query, schema_description, query_result)
-            # query_match = re.search(r'<Query>(.*?)</Query>', corrected_query, re.DOTALL)
-            # if query_match:
-            #     cypher_query = query_match.group(1).strip()
-            # else:
-            #     cypher_query = corrected_query  # Fallback if no tags are found
-
-            
             # Re-execute the corrected query
             query_result, success = execute_query_for_response_generation(cypher_query)
             
@@ -239,8 +196,6 @@ def chatbot_action(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
-
-
 @api_view(['POST'])
 def chatbot_resume(request):
     try:

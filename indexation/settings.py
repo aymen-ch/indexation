@@ -18,7 +18,7 @@ NEO4J_URI = "bolt://localhost:7687"
 NEO4J_USERNAME = "neo4j"
 NEO4J_PASSWORD = "12345678"
 NEO4J_DATABASE="neo4j"
-
+OLLAMA_URL = "http://127.0.0.1:11434"
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 

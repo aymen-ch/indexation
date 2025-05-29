@@ -1,0 +1,38 @@
+[
+  {
+    "name": "hihi",
+    "path": [
+      "Personne",
+      "Proprietaire",
+      "Phone",
+      "Appel_telephone",
+      "Phone",
+      "Proprietaire",
+      "Personne"
+    ]
+  },
+  {
+    "name": "oo",
+    "path": [
+      "Personne",
+      "Proprietaire",
+      "Phone",
+      "Appel_telephone",
+      "Phone"
+    ]
+  },
+  {
+    "name": "test",
+    "path": [
+      "Commune",
+      "situer",
+      "Unite",
+      "Traiter",
+      "Affaire",
+      "Impliquer",
+      "Personne",
+      "Proprietaire",
+      "Virtuel"
+    ]
+  }
+]

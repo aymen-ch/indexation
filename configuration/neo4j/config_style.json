@@ -1,0 +1,93 @@
+{
+  "defaultNodeSize": 90,
+  "groupNodeSize": 70,
+  "defaultNodeWidth": "200px",
+  "defaultNodeHeight": "200px",
+  "groupNodeWidth": "220px",
+  "groupNodeHeight": "220px",
+  "centerWrapperWidth": "160px",
+  "centerWrapperHeight": "160px",
+  "groupCenterWrapperWidth": "180px",
+  "groupCenterWrapperHeight": "180px",
+  "defaultImageWidth": "120px",
+  "defaultImageHeight": "120px",
+  "groupImageWidth": "100px",
+  "groupImageHeight": "100px",
+  "captionBottom": "-45px",
+  "edgeColor": "red",
+  "edgeWidth": 7,
+  "captionSize": 5,
+  "captionFontSize": "40px",
+  "captionColor": "rgb(211, 70, 54)",
+  "captionBackgroundColor": "#f1c40f",
+  "captionPadding": "5px",
+  "captionBorderRadius": "3px",
+  "captionTextShadow": "1px 1px 2px #000",
+  "nodeTypes": {
+    "Virtuel": {
+      "color": "#222839",
+      "size": 90,
+      "icon": "/icon/virtuel.png",
+      "labelKey": "Type,Nom"
+    },
+    "DAB": {
+      "color": "#CCCCCC",
+      "size": 90,
+      "icon": "/icon/default.png",
+      "labelKey": "identity"
+    },
+    "Affaire": {
+      "color": "#D20103",
+      "size": 90,
+      "icon": "/icon/affaire.png",
+      "labelKey": "Number"
+    },
+    "Wilaya": {
+      "color": "#b57336",
+      "size": 90,
+      "icon": "/icon/Wilaya.png",
+      "labelKey": "identity"
+    },
+    "Daira": {
+      "color": "#49f41a",
+      "size": 90,
+      "icon": "/icon/daira.png"
+    },
+    "Personne": {
+      "color": "#bd3291",
+      "size": 90,
+      "icon": "/icon/Personne.png",
+      "labelKey": "اللقب,الاسم,تاريخ الميلاد"
+    },
+    "Account": {
+      "color": "#CCCCCC",
+      "size": 90,
+      "icon": "/icon/default.png",
+      "labelKey": "identity"
+    },
+    "default": {
+      "color": "#CCCCCC",
+      "size": 90,
+      "icon": "/icon/default.png",
+      "labelKey": "identity"
+    },
+    "Phone": {
+      "color": "#9ec851",
+      "size": 90,
+      "icon": "/icon/Phone.png",
+      "labelKey": "identity"
+    },
+    "Unite": {
+      "color": "#8e6cb7",
+      "size": 90,
+      "icon": "/icon/Unite.png",
+      "labelKey": "identity"
+    },
+    "Commune": {
+      "color": "#ffdbdb",
+      "size": 90,
+      "icon": "/icon/Commune.png",
+      "labelKey": "identity"
+    }
+  }
+}
