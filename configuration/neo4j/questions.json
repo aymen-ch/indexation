@@ -1,9 +1,0 @@
-[
-    {
-      "id": 9,
-      "question": "ما هي القضايا التي تتعامل معها وحدة معينة؟",
-      "query": "MATCH path=(a:Affaire)-[:Traiter]-(u:Unite)  WHERE u.nom_arabe = $nom_arabe  RETURN path",
-      "parameters": { "nom_arabe": "اسم الوحدة" },
-      "parameterTypes": { "nom_arabe": "string" }
-    }
-  ]

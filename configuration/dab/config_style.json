@@ -24,23 +24,11 @@
   "captionBorderRadius": "3px",
   "captionTextShadow": "1px 1px 2px #000",
   "nodeTypes": {
-    "DAB": {
-      "color": "#9b3b3b",
-      "size": 90,
-      "icon": "/icon/default.png",
-      "labelKey": "identity"
-    },
     "default": {
       "color": "#CCCCCC",
       "size": 90,
       "icon": "/icon/default.png",
       "labelKey": "identity"
-    },
-    "Account": {
-      "color": "#355037",
-      "size": 90,
-      "icon": "/icon/accountant.png",
-      "labelKey": "identity,ccp"
     }
   }
 }
