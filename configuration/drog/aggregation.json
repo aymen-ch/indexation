@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "name": "test2",
+    "path": [
+      "Personne",
+      "Proprietaire",
+      "Phone",
+      "Appel_telephone",
+      "Phone",
+      "Proprietaire",
+      "Personne"
+    ]
+  }
+]

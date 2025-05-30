@@ -1,9 +1,0 @@
-langchain
-neo4j
-django
-djangorestframework
-langchain_community
-langchain_core
-django-cors-headers
-sentence-transformers
-tf-keras

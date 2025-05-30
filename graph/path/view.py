@@ -9,12 +9,26 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from datetime import datetime
 import uuid
-from graph.views import parse_to_graph_with_transformer, run_query
-from graph.utility import driver
+from graph.Utility_QueryExecutors import  run_query
+# from graph.utility import driver
 
 ##################################################################################################################################
 @api_view(['POST'])
-def get_all_connections4(request):
+def get_all_connections(request):
+    """
+    Retrieves all connections between the specified nodes at a given depth level.
+
+    Input:
+        request: A Django request object containing the node IDs and depth level in the request body.
+        node_ids: A list of node IDs (e.g., [1, 2, 3]) passed in the request body.
+        depth: The specific depth level (default: 1) passed in the request body.
+
+    Output:
+        A JSON response containing the paths between the specified nodes at the given depth level.
+
+    Description:
+        This function retrieves all connections between the specified nodes at a given depth level.
+    """
     node_ids = request.data.get('ids', [])  # List of node IDs (e.g., [1, 2, 3])
     depth = request.data.get('depth', 1)    # Specific depth level (default: 1)
 
@@ -82,6 +96,19 @@ def get_all_connections4(request):
 
 @api_view(['POST'])
 def shortestpath(request):
+    """
+    Retrieves the shortest path between two nodes.
+
+    Input:
+        request: A Django request object containing the node IDs in the request body.
+        node_ids: A list of node IDs (e.g., [1, 2, 3]) passed in the request body.
+
+    Output:
+        A JSON response containing the shortest path between the specified nodes.
+
+    Description:
+        This function retrieves the shortest path between two nodes.
+    """
     node_ids = request.data.get('ids', [])  # List of node IDs (e.g., [1, 2, 3])
     
     if len(node_ids) < 2:
@@ -184,5 +211,3 @@ def shortestpath(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-
-############################  for nodes > 2  it return one path as subgraphe that conenct all the specified nodes ######################################

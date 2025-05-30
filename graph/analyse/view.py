@@ -5,9 +5,9 @@ from rest_framework import status
 from django.http import JsonResponse
 from django.conf import settings
 
-from ..utility import driver
-from graph.utility import run_query
-from graph.utility_neo4j import parse_to_graph_with_transformer
+from graph.Utility_QueryExecutors import driver
+from graph.Utility_QueryExecutors import run_query
+from graph.Utility_QueryExecutors import parse_to_graph_with_transformer
 
 
 
@@ -15,21 +15,17 @@ from graph.utility_neo4j import parse_to_graph_with_transformer
 @api_view(['POST'])
 def calculate_centrality(request):
     """
-    API endpoint to calculate centrality for a given node type using specified parameters.
-    
-    Parameters (in request body):
-    - nodeType: The node type/label (e.g., 'Account')
-    - centralityAlgorithm: The centrality algorithm to use (e.g., 'Betweenness Centrality')
-    - attributeName: The name for the output property (will be prefixed with '_')
-    - normalize: Boolean indicating whether to normalize results
-    - weightProperty: Optional property to use as weight (for Betweenness Centrality)
-    - isDirected: Boolean indicating if the graph is directed
-    - selectedRelationships: List of real relationship types
-    - virtualRelationships: List of virtual relationship names (not used in calculations)
-    
+    Calculate node centrality in a graph.
+
+    Parameters:
+        node_type (str): Node type to calculate centrality for.
+        centrality_algorithm (str): Algorithm to use (e.g. 'Degree Centrality', 'Betweenness Centrality').
+        attribute_name (str): write Attribute  for centrality calculation.
+
     Returns:
-    - Centrality calculation results and top 10 nodes
+        dict: Centrality values for each node, keyed by node ID.
     """
+  
     data = request.data
     node_type = data.get('nodeType')
     centrality_algorithm = data.get('centralityAlgorithm')
@@ -315,6 +311,30 @@ def fetch_distinct_relations(request):
 
 @api_view(['POST'])
 def analyse_fetch_nodes_by_range(request):
+    """
+    Fetch and analyse nodes of a given type within a specified attribute range.
+
+    Objective:
+    -----------
+    This function aims to retrieve a subset of nodes from the graph that match the specified type and attribute range.
+    The function is designed to support data analysis and filtering tasks, such as:
+        - Identifying nodes with attribute values within a specific range
+        - Filtering out nodes with attribute values outside the specified range
+        - Retrieving nodes for further analysis or processing
+
+    Parameters:
+        node_type (str): Type of nodes to fetch (e.g. "Person", "Organization", etc.)
+        attribute (str): Attribute to filter nodes by (e.g. "age", "score", etc.)
+        start (int): Start of the range (inclusive)
+        end (int): End of the range (inclusive)
+
+    Returns:
+        list: Nodes of the specified type within the attribute range
+
+    Example Use Case:
+    -----------------
+    Fetch all "Person" top nodes with an "mony" attribute ordre by attribute then give the onces form start index to end index
+    """
     # Extract parameters from the request
     node_type = request.data.get('node_type')
     attribute = request.data.get('attribute')
@@ -357,15 +377,30 @@ def analyse_fetch_nodes_by_range(request):
 @api_view(['POST'])
 def expand_path_from_node(request):
     """
-    Expands paths from a starting node with attribute filtering and optional direction filtering.
-    Parameters (POST JSON body):
-    - id_start: The internal Neo4j ID of the starting node (required)
-    - attribute: The node attribute to filter on (default: '_betweenness')
-    - threshold: The minimum value for the attribute (default: 0.001)
-    - max_level: The maximum path expansion level (default: 10)
-    - relationship_type: The relationship type to follow (default: 'GROUPED_TRANSACTION')
-    - direction: The direction of relationships ('in', 'out', 'both') when max_level is 1 (default: 'both')
+    Expand a path from a given node in the graph.
+
+    Objective:
+    -----------
+    This function aims to traverse the graph from a specified node and expand a path based on the given direction.
+    The function is designed to support graph traversal and path exploration tasks, such as:
+        - Finding all nodes connected to a given node within a certain depth
+        - Identifying the shortest path between two nodes
+        - Retrieving all nodes and relationships within a certain distance from a given node
+
+    Parameters:
+        node_id (str): ID of the node to start the path from
+        max_depth (int): Maximum depth to traverse from the starting node
+        direction (str): Direction of traversal (e.g. "OUTGOING", "INCOMING", "BOTH")
+
+    Returns:
+        list: Expanded path from the starting node, including nodes and relationships
+
+    Example Use Case:
+    -----------------
+    Expand a path from node "123" up to a depth of 2:
+    expand_path_from_node("123", 2, "OUTGOING")
     """
+   
     try:
         # Extract and validate parameters
         params = request.data
@@ -373,7 +408,6 @@ def expand_path_from_node(request):
         attribute = params.get('attribute', '_betweenness')
         threshold = float(params.get('threshold', 0.001))
         max_level = int(params.get('max_level', 10))
-        relationship_type = params.get('relationship_type', 'GROUPED_TRANSACTION')
         direction = params.get('direction', 'both').lower()
 
         # Validate required parameters

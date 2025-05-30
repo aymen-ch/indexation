@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+# from . import views
 from .aggregation import view as view_aggregation
 from .chatbot import view as vchat
 from .contextualization import view as context_view
@@ -39,7 +39,6 @@ urlpatterns = [
     path('get_node_relationships/', view_contextmenu.get_node_relationships, name='get_node_relationships'),
     path('get_virtual_relationships/', view_contextmenu.get_virtual_relationships, name='get_virtual_relationships'),
     path('execute_action/', view_contextmenu.execute_action, name='execute_action'),
-    
     path('get_virtual_relation_count/', view_contextmenu.get_virtual_relation_count, name='get_virtual_relation_count'),
     #################################interrogation cible par type de node + rechreche #################################
     path('node-types/', view_intreogcible.get_node_types, name='get_node_types'),
@@ -60,7 +59,7 @@ urlpatterns = [
     path('chatbot/resume/', vchat.chatbot_resume, name='chatbot_resume'),
     path('generate_action', vchat.chatbot_generate_action, name='action'),
     ############################## path ####################################
-    path('get_all_connections/', path_view.get_all_connections4, name='get_all_connections'),
+    path('get_all_connections/', path_view.get_all_connections, name='get_all_connections'),
     path('shortestpath/', path_view.shortestpath, name='shortestpath'),
     ############################## Data Base Managment  ####################################
     path('list_all_databases/', view_dataBaseManagment.list_all_databases_view, name='list_all_databases_view'),

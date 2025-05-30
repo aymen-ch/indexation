@@ -9,7 +9,7 @@ from datetime import datetime
 import uuid
 from django.conf import settings
 import neo4j
-from graph.utility_neo4j import parse_to_graph_with_transformer, run_query
+from graph.Utility_QueryExecutors import parse_to_graph_with_transformer, run_query
 def fetch_node_types():
     """
     Fetches all distinct node labels from the Neo4j database.
@@ -73,6 +73,18 @@ def fetch_node_properties(node_type):
 
 @api_view(['GET'])
 def get_node_types(request):
+    """
+    Fetches all distinct node labels from the Neo4j database.
+
+    Input:
+        None
+
+    Output:
+        A JSON response containing a list of node types.
+
+    Description:
+        This function retrieves all distinct node labels from the Neo4j database and returns them as a JSON response.
+    """
     try:
         node_types = fetch_node_types()
         return Response({"node_types": node_types}, status=status.HTTP_200_OK)
@@ -81,6 +93,19 @@ def get_node_types(request):
 
 @api_view(['GET'])
 def get_node_properties(request):
+    """
+    Fetches properties and their types for a specific node type from Neo4j.
+
+    Input:
+        request: A Django request object containing the node type in the request query parameters.
+        node_type: The node type for which to retrieve properties.
+
+    Output:
+        A JSON response containing the properties and their types for the specified node type.
+
+    Description:
+        This function retrieves properties and their types for a specific node type from Neo4j and returns them as a JSON response.
+    """
     node_type = request.GET.get('node_type', '')
     if not node_type:
         return Response(
@@ -99,6 +124,20 @@ def get_node_properties(request):
 
 @api_view(['POST'])
 def search_nodes(request):
+    """
+    Searches for nodes in the Neo4j database based on the provided search criteria.
+
+    Input:
+        request: A Django request object containing the search criteria in the request body.
+        node_type: The type of node to search for.
+        properties: A dictionary of properties to search for, where each key is a property name and each value is a dictionary containing the value and operation to perform.
+
+    Output:
+        A JSON response containing the results of the search query.
+
+    Description:
+        This function searches for nodes in the Neo4j database based on the provided search criteria, which includes the node type and a dictionary of properties to search for. The function returns the results of the search query as a JSON response.
+    """
     try:
         node_type = request.data.get('node_type')
         search_payload = request.data.get('properties', {})
@@ -160,6 +199,19 @@ def search_nodes(request):
     
 @api_view(['POST'])
 def recherche(request):
+    """
+    Performs a search query on the Neo4j database.
+
+    Input:
+        request: A Django request object containing the search query in the request body.
+        query: The search query to execute.
+
+    Output:
+        A JSON response containing the results of the search query.
+
+    Description:
+        This function performs a search query on the Neo4j database and returns the results as a JSON response.
+    """
     search_value = request.data.get('query')
     print(f"Search query: {search_value}")
     

@@ -4,14 +4,25 @@ from rest_framework.response import Response
 from rest_framework import status
 import json
 from .utils import *
-from graph.views import run_query
+from graph.Utility_QueryExecutors import run_query
 
 
 @api_view(['POST'])
 def execute_query(request):
     """
-    Django view to execute a Neo4j query.
-    Expects a JSON payload with 'query' and 'parameters'.
+    Executes a Neo4j query and returns the result as JSON.
+
+    This function takes a query and parameters as input, and returns the query result.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+        data (dict): The JSON payload containing the query and parameters.
+
+    Returns:
+        JsonResponse: A JSON response with the query result.
+
+    Raises:
+        Exception: If any error occurs during query execution.
     """
     try:
         # Parse the JSON payload
@@ -39,6 +50,24 @@ import re
 
 @api_view(['POST'])
 def chatbot(request):
+    
+    """
+    Handles the POST request to the /chatbot endpoint.
+
+    This function takes a question, answer type, and model as input, and returns a response.
+    It uses the LLM to generate a Cypher query, executes the query, and returns the result.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+        data (dict): The JSON payload containing the question, answer type, and model.
+
+    Returns:
+        Response: A JSON response with the query result and Cypher query.
+
+    Raises:
+        json.JSONDecodeError: If the request body contains invalid JSON.
+        Exception: If any other error occurs.
+    """
     
     try:
         # Parse the request body
@@ -132,6 +161,21 @@ def chatbot(request):
     
 @api_view(['POST'])
 def chatbot_generate_action(request):
+    """
+    Handles the POST request to the /chatbot/generate/action endpoint.
+
+    This function takes a question, node type, and model as input, and returns a Cypher query and response.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+        data (dict): The JSON payload containing the question, node type, and model.
+
+    Returns:
+        JsonResponse: A JSON response with the Cypher query and response.
+
+    Raises:
+        Exception: If any error occurs.
+    """
     try:
         # Parse the request body
         data = json.loads(request.body)
@@ -198,6 +242,22 @@ def chatbot_generate_action(request):
     
 @api_view(['POST'])
 def chatbot_resume(request):
+    """
+    Handles the POST request to the /chatbot/resume endpoint.
+
+    This function takes the raw response from a previous call, a model, and a question as input, and returns a resumed response.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+        data (dict): The JSON payload containing the raw response, model, and question.
+
+    Returns:
+        Response: A JSON response with the resumed content and Cypher query.
+
+    Raises:
+        json.JSONDecodeError: If the request body contains invalid JSON.
+        Exception: If any other error occurs.
+    """
     try:
         # Parse the request body
         data = json.loads(request.body)

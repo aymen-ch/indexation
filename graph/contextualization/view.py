@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from datetime import datetime
 import uuid
-from graph.views import run_query
+from graph.Utility_QueryExecutors import run_query
 
 @api_view(['POST'])
 def get_daira_and_commune(request):

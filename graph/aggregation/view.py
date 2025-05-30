@@ -4,25 +4,50 @@ from rest_framework.response import Response
 from rest_framework import status
 import neo4j
 
-from graph.utility import run_query, driver
-from graph.utility_neo4j import parse_to_graph_with_transformer
+# from graph.utility import  driver
+from graph.Utility_QueryExecutors import parse_to_graph_with_transformer,run_query
+
 
 
 
 
 @api_view(['POST'])
 def aggregate(request):
+    """
+    Aggregates nodes and relationships based on given node IDs and aggregation type.
+
+    The aggregation type is a list of lists, where each sublist represents a node-relationship-node pattern.
+    The sublist must have an odd length, with the first and last elements being node types and the middle
+    elements being relationship types.
+
+    The response is a JSON object with two keys: "nodes" and "relationships". The "nodes" key contains a list
+    of objects with the following properties: "id", "type", "properties", and "aggregated_properties". The
+    "relationships" key contains a list of objects with the following properties: "startId", "endId", "type",
+    and "count".
+
+    If the query fails, a 500 status code is returned with an error message.
+
+    :param request: The request object containing the node IDs and aggregation type.
+    :return: A JSON response with the aggregated nodes and relationships.
+    """
     id_nodes = request.data.get("node_ids", [1160, 126224, 129664, 129668, 136220, 1368, 1370, 34151, 34155])  # List of node IDs
     aggregation_type = request.data.get("aggregation_type", [["Personne", "Impliquer", "Affaire", "Impliquer", "Personne"]])
     type = request.data.get("type","memeaffaire")
     if not id_nodes:
         return Response({"error": "id_nodes parameter is required"}, status=400)
+
     print(id_nodes)
     query_parts = []
     params = {"id_nodes": id_nodes}
     alias_counter = {}  # Dictionary to track alias counts
 
     def get_alias(name):
+        """
+        Generate a unique alias based on the first letter of the node type.
+
+        :param name: The node type to generate an alias for.
+        :return: A unique alias for the node type.
+        """
         """Generate a unique alias based on the first letter of the node type."""
         first_letter = name[0].upper()  # Take the first character and capitalize
         alias_counter[first_letter] = alias_counter.get(first_letter, 0) + 1
@@ -147,6 +172,7 @@ def aggregate(request):
         print(e)
         
         return Response({"error": f"Query failed: {str(e)}"}, status=500)
+
 
 
 

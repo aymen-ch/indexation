@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from pathlib import Path
 
-from graph.utility_neo4j import parse_to_graph_with_transformer
-from graph.views import run_query
+from graph.Utility_QueryExecutors import parse_to_graph_with_transformer
+from graph.Utility_QueryExecutors import run_query
 
 # Base configuration directory
 CONFIG_BASE_DIR = Path(settings.BASE_DIR) / 'configuration'

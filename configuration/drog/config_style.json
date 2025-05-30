@@ -29,6 +29,54 @@
       "size": 90,
       "icon": "/icon/default.png",
       "labelKey": "identity"
+    },
+    "Daira": {
+      "color": "#208d3b",
+      "size": 90,
+      "icon": "/icon/Daira.png",
+      "labelKey": "identity"
+    },
+    "Commune": {
+      "color": "#ac1b1b",
+      "size": 90,
+      "icon": "/icon/Commune.png",
+      "labelKey": "identity"
+    },
+    "Wilaya": {
+      "color": "#75a117",
+      "size": 90,
+      "icon": "/icon/Wilaya.png",
+      "labelKey": "identity"
+    },
+    "Unite": {
+      "color": "#88257b",
+      "size": 90,
+      "icon": "/icon/Unite.png",
+      "labelKey": "identity"
+    },
+    "Affaire": {
+      "color": "#e31616",
+      "size": 90,
+      "icon": "/icon/Affaire.png",
+      "labelKey": "identity"
+    },
+    "Personne": {
+      "color": "#6befe7",
+      "size": 90,
+      "icon": "/icon/Personne.png",
+      "labelKey": "identity"
+    },
+    "Phone": {
+      "color": "#ecd855",
+      "size": 90,
+      "icon": "/icon/Phone.png",
+      "labelKey": "identity"
+    },
+    "Virtuel": {
+      "color": "#1b34b1",
+      "size": 90,
+      "icon": "/icon/Virtuel.png",
+      "labelKey": "identity"
     }
   }
 }

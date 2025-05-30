@@ -10,9 +10,21 @@ from datetime import datetime
 import uuid
 from django.conf import settings
 import neo4j
-from graph.utility_neo4j  import run_query
+from graph.Utility_QueryExecutors  import run_query
 @api_view(['POST'])
 def getdata(request):
+    """
+    Retrieves a node from the Neo4j database based on its identity.
+
+    Input:
+        - identity (str): The ID of the node to retrieve.
+
+    Output:
+        - node_data (dict): The retrieved node data.
+
+    Description:
+        Handles a POST request to retrieve a node from the Neo4j database based on its identity.
+    """
     identity = request.data.get('identity')
     if not identity:
         return Response(
@@ -39,6 +51,19 @@ def getdata(request):
 
 @api_view(['POST'])
 def getrelationData(request):
+    """
+    Retrieves relationship data between nodes in the Neo4j database.
+
+    Input:
+        - identity (str): The ID of the starting node.
+        - path (list): A list of node labels and relationship types.
+
+    Output:
+        - relationship_data (dict): The retrieved relationship data.
+
+    Description:
+        Handles a POST request to retrieve relationship data between nodes in the Neo4j database.
+    """
     identity = request.data.get('identity')
     path = request.data.get('path')
     print(f"Identity: {identity}, Path: {path}")
@@ -157,89 +182,23 @@ def getrelationData(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
-@api_view(['GET'])
-def node_type_analysis(request):
-    try:
-        # Step 1: Fetch all distinct node types
-        label_query = """
-        MATCH (n)
-        UNWIND labels(n) AS label
-        WITH DISTINCT label
-        RETURN label
-        """
-        label_results = run_query(label_query, database=settings.NEO4J_DATABASE)
-        node_types = [record["label"] for record in label_results]
-
-        if not node_types:
-            return Response(
-                {"error": "No node types found in the database."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Step 2: Analyze each node type
-        response_data = []
-        for node_type in node_types:
-            # Query to compute analytical properties
-            analysis_query = f"""
-            MATCH (n:{node_type})
-            OPTIONAL MATCH (n)<-[r_in]-()
-            OPTIONAL MATCH (n)-[r_out]->()
-            WITH n, 
-                 COUNT(r_in) AS incoming_links,
-                 COUNT(r_out) AS outgoing_links,
-                 COLLECT(r_in) AS incoming_rels,
-                 COLLECT(r_out) AS outgoing_rels
-            WITH incoming_links,
-                 outgoing_links,
-                 incoming_rels,
-                 outgoing_rels,
-                 [rel IN incoming_rels | [k IN keys(rel) WHERE k <> 'identity' AND apoc.meta.type(rel[k]) IN ['INTEGER', 'LONG', 'FLOAT', 'DOUBLE'] | rel[k]]] AS in_values,
-                 [rel IN outgoing_rels | [k IN keys(rel) WHERE k <> 'identity' AND apoc.meta.type(rel[k]) IN ['INTEGER', 'LONG', 'FLOAT', 'DOUBLE'] | rel[k]]] AS out_values
-            WITH incoming_links,
-                 outgoing_links,
-                 REDUCE(s = 0, vals IN in_values | s + REDUCE(inner_s = 0, v IN vals | inner_s + COALESCE(v, 0))) AS sum_incoming_values,
-                 REDUCE(s = 0, vals IN out_values | s + REDUCE(inner_s = 0, v IN vals | inner_s + COALESCE(v, 0))) AS sum_outgoing_values
-            RETURN incoming_links,
-                   outgoing_links,
-                   sum_incoming_values,
-                   sum_outgoing_values
-            LIMIT 1
-            """
-            analysis_results = run_query(analysis_query, database=settings.NEO4J_DATABASE)
-            
-            # Default values if no relationships exist
-            analysis_data = {
-                "incoming_links": 0,
-                "outgoing_links": 0,
-                "sum_incoming_values": 0,
-                "sum_outgoing_values": 0
-            }
-            
-            if analysis_results:
-                record = analysis_results[0]
-                analysis_data = {
-                    "incoming_links": record["incoming_links"],
-                    "outgoing_links": record["outgoing_links"],
-                    "sum_incoming_values": record["sum_incoming_values"],
-                    "sum_outgoing_values": record["sum_outgoing_values"]
-                }
-
-            # Combine with node type
-            response_data.append({
-                "node_type": node_type,
-                "properties_analyse": analysis_data
-            })
-
-        return Response(response_data, status=status.HTTP_200_OK)
-
-    except Exception as e:
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-    
+   
 @api_view(['POST'])
 def node_type_attribute_insert(request):
+    """
+    Inserts attributes for a node type in the Neo4j database.
+
+    Input:
+        - node_type (str): The type of node to insert attributes for.
+        - attribute_name (str): The name of the attribute to insert.
+        - attribute_value (str): The value of the attribute to insert.
+
+    Output:
+        - result (dict): A dictionary containing the result of the insertion.
+
+    Description:
+        Handles a POST request to insert attributes for a node type in the Neo4j database.
+    """
     try:
         # Step 1: Extract node type from request data
         node_type = request.data.get('node_type')
@@ -300,6 +259,18 @@ def node_type_attribute_insert(request):
 
 @api_view(['POST'])
 def get_outgoing_relationship_attributes(request):
+    """
+    Retrieves outgoing relationship attributes for a node in the Neo4j database.
+
+    Input:
+        - node_id (int): The ID of the node to retrieve outgoing relationship attributes for.
+
+    Output:
+        - attributes (dict): A dictionary containing the outgoing relationship attributes.
+
+    Description:
+        Handles a POST request to retrieve outgoing relationship attributes for a node in the Neo4j database.
+    """
     try:
         # Step 1: Extract node type from request data
         node_type = request.data.get('node_type')
@@ -354,6 +325,18 @@ def get_outgoing_relationship_attributes(request):
 
 @api_view(['POST'])
 def get_incoming_relationship_attributes(request):
+    """
+    Retrieves incoming relationship attributes for a node in the Neo4j database.
+
+    Input:
+        - node_id (int): The ID of the node to retrieve incoming relationship attributes for.
+
+    Output:
+        - attributes (dict): A dictionary containing the incoming relationship attributes.
+
+    Description:
+        Handles a POST request to retrieve incoming relationship attributes for a node in the Neo4j database.
+    """
     try:
         # Step 1: Extract node type from request data
         node_type = request.data.get('node_type')
@@ -407,6 +390,20 @@ def get_incoming_relationship_attributes(request):
    
 @api_view(['POST'])
 def insert_node_attribute(request):
+    """
+    Inserts an attribute for a node in the Neo4j database.
+
+    Input:
+        - node_id (int): The ID of the node to insert an attribute for.
+        - attribute_name (str): The name of the attribute to insert.
+        - attribute_value (str): The value of the attribute to insert.
+
+    Output:
+        - result (dict): A dictionary containing the result of the insertion.
+
+    Description:
+        Handles a POST request to insert an attribute for a node in the Neo4j database.
+    """
     try:
         # Step 1: Extract input from request data
         node_type = request.data.get('node_type')
@@ -516,6 +513,18 @@ def insert_node_attribute(request):
 
 @api_view(['POST'])
 def get_relationship_properties(request):
+    """
+    Retrieves properties for a relationship in the Neo4j database.
+
+    Input:
+        - relationship_type (str): The type of relationship to retrieve properties for.
+
+    Output:
+        - properties (dict): A dictionary containing the properties of the relationship.
+
+    Description:
+        Handles a POST request to retrieve properties for a relationship in the Neo4j database.
+    """
     try:
         relationship_type = request.data.get('relationship_type')
         if not relationship_type:
@@ -558,6 +567,18 @@ def get_relationship_properties(request):
         )
 @api_view(['POST'])
 def get_node_properties(request):
+    """
+    Retrieves properties for a node in the Neo4j database.
+
+    Input:
+        - node_type (str): The type of node to retrieve properties for.
+
+    Output:
+        - properties (dict): A dictionary containing the properties of the node.
+
+    Description:
+        Handles a POST request to retrieve properties for a node in the Neo4j database.
+    """
     try:
         node_type = request.data.get('node_type')
         print(node_type)
@@ -603,6 +624,19 @@ def get_node_properties(request):
       
 @api_view(['POST'])
 def node_analysis(request):
+    """
+    Performs an analysis of a node in the Neo4j database.
+
+    Input:
+        request: A Django request object containing the node ID in the request body.
+        id: The ID of the node to analyze.
+
+    Output:
+        A JSON response containing the results of the analysis.
+
+    Description:
+        This function performs an analysis of a node in the Neo4j database, including calculating the number of incoming and outgoing relationships, and summing the values of the relationships.
+    """
     node_id = request.data.get('id')
     
     if node_id is None:

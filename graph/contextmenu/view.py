@@ -13,10 +13,25 @@ from datetime import datetime
 import uuid
 from django.conf import settings
 import neo4j
-from graph.utility_neo4j import parse_to_graph_with_transformer,run_query
+from graph.Utility_QueryExecutors import parse_to_graph_with_transformer,run_query
 CONFIG_FILE = os.path.join(settings.BASE_DIR, 'actions.json')
 @api_view(['POST'])
 def get_possible_relations(request):
+    """
+    Retrieves a list of possible relations for a given node type and ID.
+
+    This function takes the node type and ID as input, and returns a list of possible relations.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+        data (dict): The JSON payload containing the node type and ID.
+
+    Returns:
+        Response: A JSON response with a list of possible relations.
+
+    Raises:
+        Exception: If any error occurs during relation retrieval.
+    """
     # Get data from the request body
     print(request.data)
     node_type = request.data.get('node_type')
@@ -70,6 +85,21 @@ def get_possible_relations(request):
 
 @api_view(['POST'])
 def get_virtual_relation_count(request):
+    """
+    Retrieves the count of virtual relations for a given node type, ID, and path.
+
+    This function takes the node type, ID, and path as input, and returns the count of virtual relations.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+        data (dict): The JSON payload containing the node type, ID, and path.
+
+    Returns:
+        Response: A JSON response with the count of virtual relations.
+
+    Raises:
+        Exception: If any error occurs during virtual relation count retrieval."""
+    
     # Get data from the request body
     data = request.data
     node_type = data.get('node_type')
@@ -138,97 +168,23 @@ def get_virtual_relation_count(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-@api_view(['POST'])
-def add_action(request):
-    try:
-        # Validate required fields except node_id (now optional)
-        required_fields = ['name', 'description', 'node_type', 'id_field', 'query']
-        for field in required_fields:
-            if field not in request.data:
-                return Response(
-                    {"error": f"Missing required field: {field}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        print(request.data)
-        new_action = {
-            "name": request.data['name'],
-            "description": request.data['description'],
-            "node_type": request.data['node_type'],
-            "id_field": request.data['id_field'],
-            "query": request.data['query']
-        }
-
-        # Get node_id if provided, otherwise fetch a random one
-        node_id = request.data.get('node_id')
-        if not node_id:
-            try:
-                # Use a Cypher query to fetch a random node ID of the specified type
-                random_id_query = f"MATCH (n:{new_action['node_type']}) RETURN id(n) AS id LIMIT 1"
-                result = run_query(random_id_query)
-                if not result:
-                    return Response(
-                        {"error": f"No node found for type '{new_action['node_type']}'"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                node_id = result[0]['id']
-            except Exception as e:
-                return Response(
-                    {"error": f"Failed to fetch random node ID: {str(e)}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
-        # Step 1: Test the Cypher query
-        try:
-            query = new_action['query']
-            id_field = new_action['id_field']
-            parameters = {id_field: int(node_id)}
-            graph_data = parse_to_graph_with_transformer(query, parameters)
-
-            if not graph_data["nodes"] and not graph_data["edges"]:
-                return Response(
-                    {"error": "Query did not return any nodes, relationships, or paths"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        except Exception as e:
-            return Response(
-                {"error": f"Invalid Cypher query: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Step 2: Load existing actions
-        try:
-            with open(CONFIG_FILE, 'r') as file:
-                actions_config = json.load(file)
-        except FileNotFoundError:
-            actions_config = []
-
-        # Check for duplicate action name
-        if any(action['name'] == new_action['name'] for action in actions_config):
-            return Response(
-                {"error": f"Action '{new_action['name']}' already exists"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Append new action
-        actions_config.append(new_action)
-
-        # Save updated config
-        with open(CONFIG_FILE, 'w') as file:
-            json.dump(actions_config, file, indent=2)
-
-        return Response(
-            {"message": f"Action '{new_action['name']}' added successfully"},
-            status=status.HTTP_201_CREATED
-        )
-
-    except Exception as e:
-        return Response(
-            {"error": f"Error adding action: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
+# 
 @api_view(['POST'])
 def execute_action(request):
+    """
+    Retrieves a list of actions.
+
+    This function takes no input, and returns a list of actions.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        Response: A JSON response with a list of actions.
+
+    Raises:
+        Exception: If any error occurs during action retrieval.
+    """
     # Get action name and node ID from request body
     action_name = request.data.get('action_name', None)
     id = request.data.get('id', None)
@@ -287,6 +243,21 @@ def execute_action(request):
 
 @api_view(['POST'])
 def get_node_relationships(request):
+    """
+    Retrieves a list of relationships for a given node type, ID, and relation type.
+
+    This function takes the node type, ID, relation type, and expand limit as input, and returns a list of relationships.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+        data (dict): The JSON payload containing the node type, ID, relation type, and expand limit.
+
+    Returns:
+        Response: A JSON response with a list of relationships.
+
+    Raises:
+        Exception: If any error occurs during relationship retrieval.
+    """
     print(request.data)
     node_type = request.data.get('node_type')
     id = request.data.get('id', 12)
@@ -329,6 +300,22 @@ def get_node_relationships(request):
 
 @api_view(['POST'])
 def get_virtual_relationships(request):
+
+    """
+    Retrieves a list of virtual relationships for a given node type, ID, and path.
+
+    This function takes the node type, ID, virtual relation, and path as input, and returns a list of virtual relationships.
+
+    Parameters:
+        request (HttpRequest): The HTTP request object.
+        data (dict): The JSON payload containing the node type, ID, virtual relation, and path.
+
+    Returns:
+        Response: A JSON response with a list of virtual relationships.
+
+    Raises:
+        Exception: If any error occurs during virtual relationship retrieval.
+    """
     # Get data from the request body
     print(request.data)
     node_type = request.data.get('node_type')

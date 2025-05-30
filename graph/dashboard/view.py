@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from django.conf import settings
 from django.core.cache import cache
 from neo4j import GraphDatabase
-from ..utility   import driver
+from graph.Utility_QueryExecutors  import driver
 @api_view(['GET'])
 def get_database_stats_view(request):
     """
