@@ -138,7 +138,7 @@ def chatbot_generate_action(request):
         question = data.get('question')  # Extract the user's question
         node_type = data.get('node_type', 'Affaire')  # Default to 'Text' if not provided
         modele = data.get('model')  # Default to 'Text' if not provide
-     
+        print(question)
         print(request.body)
         if not question:
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
@@ -147,8 +147,8 @@ def chatbot_generate_action(request):
 
         prompt = cypher_promp_action(question=question, node_type=node_type)
        
-        cypher_response = call_ollama(prompt=prompt, model=modele)
-
+        # cypher_response = call_ollama(prompt=prompt, model=modele)
+        cypher_response="hi"
         # Extract the query between <Query> tags
         query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
         if query_match:

@@ -43,7 +43,7 @@ urlpatterns = [
     path('get_virtual_relation_count/', view_contextmenu.get_virtual_relation_count, name='get_virtual_relation_count'),
     #################################interrogation cible par type de node + rechreche #################################
     path('node-types/', view_intreogcible.get_node_types, name='get_node_types'),
-    path('node-types/properties/', view_intreogcible.get_node_properties, name='get_node_properties'),
+    path('node-types/properties_types/', view_intreogcible.get_node_properties, name='get_node_properties'),
     path('search-nodes/', view_intreogcible.search_nodes, name='search_nodes'),
     path('recherche/', view_intreogcible.recherche, name='recherche'),
     ################################# contextualization #################################
@@ -58,7 +58,7 @@ urlpatterns = [
     path('chatbot/', vchat.chatbot, name='chat'),
     path('run/', vchat.execute_query, name='execute_query'),
     path('chatbot/resume/', vchat.chatbot_resume, name='chatbot_resume'),
-    path('generate_action', vchat.chatbot_generate_action, name='action'),
+    path('generate_action/', vchat.chatbot_generate_action, name='action'),
     ############################## path ####################################
     path('get_all_connections/', path_view.get_all_connections4, name='get_all_connections'),
     path('shortestpath/', path_view.shortestpath, name='shortestpath'),
