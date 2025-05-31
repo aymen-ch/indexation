@@ -56,6 +56,7 @@ def parse_to_graph_with_transformer(query, params=None, database=None):
     **Output:**
     dict: A dictionary containing the parsed graph structure, with nodes and edges as lists of dictionaries.
     """
+
     try:
         graph_result = driver.execute_query(
             query,
