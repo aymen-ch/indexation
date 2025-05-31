@@ -43,7 +43,7 @@
       "labelKey": "Number"
     },
     "Wilaya": {
-      "color": "#b57336",
+      "color": "#3684b5",
       "size": 90,
       "icon": "/icon/Wilaya.png",
       "labelKey": "identity"
@@ -54,10 +54,10 @@
       "icon": "/icon/daira.png"
     },
     "Personne": {
-      "color": "#bd3291",
+      "color": "green",
       "size": 90,
       "icon": "/icon/Personne.png",
-      "labelKey": "اللقب,الاسم,تاريخ الميلاد"
+      "labelKey": "identity"
     },
     "Account": {
       "color": "#CCCCCC",
@@ -72,7 +72,7 @@
       "labelKey": "identity"
     },
     "Phone": {
-      "color": "#9ec851",
+      "color": "#e7f529",
       "size": 90,
       "icon": "/icon/Phone.png",
       "labelKey": "identity"

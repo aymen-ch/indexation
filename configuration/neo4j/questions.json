@@ -1,1 +1,24 @@
-[]
+[
+  {
+    "id": 1,
+    "question": "Trouver les affaire de la numero ",
+    "query": "MATCH path = (a:Affaire {Number:$number})-[]-(:Personne) RETURN path",
+    "parameters": {
+      "number": "numero affaire"
+    },
+    "parameterTypes": {
+      "number": "string"
+    }
+  },
+  {
+    "id": 2,
+    "question": "Trouver les affaire de la numero2",
+    "query": "MATCH path=(a:Affaire {Number:$numberaffaire})-[]-(p:Personne) RETURN path",
+    "parameters": {
+      "numberaffaire": "dd"
+    },
+    "parameterTypes": {
+      "numberaffaire": "string"
+    }
+  }
+]

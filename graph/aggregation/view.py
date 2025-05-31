@@ -31,7 +31,7 @@ def aggregate(request):
     :return: A JSON response with the aggregated nodes and relationships.
     """
     id_nodes = request.data.get("node_ids", [1160, 126224, 129664, 129668, 136220, 1368, 1370, 34151, 34155])  # List of node IDs
-    aggregation_type = request.data.get("aggregation_type", [["Personne", "Impliquer", "Affaire", "Impliquer", "Personne"]])
+    aggregation_path = request.data.get("aggregation_path", [["Personne", "Impliquer", "Affaire", "Impliquer", "Personne"]])
     type = request.data.get("type","memeaffaire")
     if not id_nodes:
         return Response({"error": "id_nodes parameter is required"}, status=400)
@@ -53,7 +53,7 @@ def aggregate(request):
         alias_counter[first_letter] = alias_counter.get(first_letter, 0) + 1
         return f"{first_letter}{alias_counter[first_letter]}"
 
-    for sublist in aggregation_type:
+    for sublist in aggregation_path:
         print(sublist)
         # Ensure the sublist has an odd length (node-relationship-node pattern)
         if len(sublist) % 2 == 0:  # Even length means invalid path

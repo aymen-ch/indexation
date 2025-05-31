@@ -1,28 +1,78 @@
 from django.http import JsonResponse
+import neo4j
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 import json
 from .utils import *
-from graph.Utility_QueryExecutors import run_query
+from graph.Utility_QueryExecutors import parse_to_graph_with_transformer, run_query,get_neo4j_driver
+
+
+
+
+
+
+def get_ollama_models() -> list:
+    """
+    Fetches the list of available models from the remote Ollama server.
+    Returns:
+        list: A list of model dictionaries (e.g., name, size, modified).
+    Raises:
+        Exception: If the request fails or response is invalid.
+    """
+    ollama_url = settings.OLLAMA_URL + "/api/tags"
+    response = requests.get(ollama_url)
+
+    if response.status_code == 200:
+        response_json = response.json()
+        if 'models' in response_json:
+            return response_json['models']
+        else:
+            raise Exception("No 'models' field in the response.")
+    else:
+        raise Exception(f"Error from Ollama server: {response.status_code}, {response.text}")
+@api_view(['POST'])
+def getollamamodeles(request): 
+    try:
+        models = get_ollama_models()
+        return Response(models, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+def execute_query_graph(request):
+    """
+    Django view to execute a Neo4j query.
+    Expects a JSON payload with 'query' and 'parameters'.
+    """
+    try:
+        # Parse the JSON payload
+        data = request.data
+        query = data.get('query')
+        parameters = data.get('parameters', {})  # Default to empty dict if no parameters provided
+        print(query)
+        print(parameters)
+        # Validate the query
+        if not query:
+            return JsonResponse({'error': 'Query is required'}, status=400)
+
+        # Run the query using the utility function
+        result=parse_to_graph_with_transformer(query,parameters)
+        print(result)
+        # Return the full query result as JSON
+        return Response(result, status=200)
+
+
+    except Exception as e:
+        print(e)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @api_view(['POST'])
-def execute_query(request):
+def execute_query_table(request):
     """
-    Executes a Neo4j query and returns the result as JSON.
-
-    This function takes a query and parameters as input, and returns the query result.
-
-    Parameters:
-        request (HttpRequest): The HTTP request object.
-        data (dict): The JSON payload containing the query and parameters.
-
-    Returns:
-        JsonResponse: A JSON response with the query result.
-
-    Raises:
-        Exception: If any error occurs during query execution.
+    Django view to execute a Neo4j query.
+    Expects a JSON payload with 'query' and 'parameters'.
     """
     try:
         # Parse the JSON payload
@@ -50,31 +100,13 @@ import re
 
 @api_view(['POST'])
 def chatbot(request):
-    
-    """
-    Handles the POST request to the /chatbot endpoint.
-
-    This function takes a question, answer type, and model as input, and returns a response.
-    It uses the LLM to generate a Cypher query, executes the query, and returns the result.
-
-    Parameters:
-        request (HttpRequest): The HTTP request object.
-        data (dict): The JSON payload containing the question, answer type, and model.
-
-    Returns:
-        Response: A JSON response with the query result and Cypher query.
-
-    Raises:
-        json.JSONDecodeError: If the request body contains invalid JSON.
-        Exception: If any other error occurs.
-    """
-    
     try:
         # Parse the request body
         data = json.loads(request.body)
         question = data.get('question')  # Extract the user's question
         answer_type = data.get('answer_type', 'Text')  # Default to 'Text' if not provided
         modele = data.get('model')  # Default to 'Text' if not provide
+        print(modele)
         selected_nodes = data.get('selected_nodes', '')
         print(request.body)
         if not question:
@@ -89,8 +121,8 @@ def chatbot(request):
                 prompt = prompt_graph_query(question=question)
             else:
                 prompt = prompt_table_query(question=question)
-        cypher_response = call_ollama(prompt=prompt, model=modele)
-
+        # cypher_response = call_ollama(prompt=prompt, model=modele)
+        cypher_response="MATCH (a:Affaire {Number:'Drog_19'})-[]-(p:Personne) RETURN p.num as num,a.Number as numberaffaire"
         # Extract the query between <Query> tags
         query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
         if query_match:
@@ -101,7 +133,7 @@ def chatbot(request):
     
         query_result, success = execute_query_for_response_generation(cypher_query)
         # Debugging: Print the Cypher query
-        print("Generated Cypher Query:", cypher_query)
+        print("Generated Cypher Query:", success)
 
         if not success:
             # Re-execute the corrected query
@@ -161,28 +193,12 @@ def chatbot(request):
     
 @api_view(['POST'])
 def chatbot_generate_action(request):
-    """
-    Handles the POST request to the /chatbot/generate/action endpoint.
-
-    This function takes a question, node type, and model as input, and returns a Cypher query and response.
-
-    Parameters:
-        request (HttpRequest): The HTTP request object.
-        data (dict): The JSON payload containing the question, node type, and model.
-
-    Returns:
-        JsonResponse: A JSON response with the Cypher query and response.
-
-    Raises:
-        Exception: If any error occurs.
-    """
     try:
         # Parse the request body
         data = json.loads(request.body)
         question = data.get('question')  # Extract the user's question
         node_type = data.get('node_type', 'Affaire')  # Default to 'Text' if not provided
         modele = data.get('model')  # Default to 'Text' if not provide
-        print(question)
         print(request.body)
         if not question:
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
@@ -191,8 +207,8 @@ def chatbot_generate_action(request):
 
         prompt = cypher_promp_action(question=question, node_type=node_type)
        
-        # cypher_response = call_ollama(prompt=prompt, model=modele)
-        cypher_response="hi"
+        cypher_response = call_ollama(prompt=prompt, model=modele)
+
         # Extract the query between <Query> tags
         query_match = re.search(r'<Query>(.*?)</Query>', cypher_response, re.DOTALL)
         if query_match:
@@ -242,22 +258,6 @@ def chatbot_generate_action(request):
     
 @api_view(['POST'])
 def chatbot_resume(request):
-    """
-    Handles the POST request to the /chatbot/resume endpoint.
-
-    This function takes the raw response from a previous call, a model, and a question as input, and returns a resumed response.
-
-    Parameters:
-        request (HttpRequest): The HTTP request object.
-        data (dict): The JSON payload containing the raw response, model, and question.
-
-    Returns:
-        Response: A JSON response with the resumed content and Cypher query.
-
-    Raises:
-        json.JSONDecodeError: If the request body contains invalid JSON.
-        Exception: If any other error occurs.
-    """
     try:
         # Parse the request body
         data = json.loads(request.body)
