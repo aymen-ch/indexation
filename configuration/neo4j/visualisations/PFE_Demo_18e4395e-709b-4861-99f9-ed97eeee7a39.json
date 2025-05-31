@@ -1,0 +1,312 @@
+{
+  "name": "PFE Demo",
+  "nodes": [
+    {
+      "id": "1149",
+      "group": "Affaire",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "#D20103",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "Number: Drog_1",
+      "aggregatedproperties": null,
+      "properties": {
+        "identity": 1149,
+        "Type": "مخدرات",
+        "Number": "Drog_1",
+        "date": "17-04-2023",
+        "type": "Affaire",
+        "score": 1
+      },
+      "image": "/icon/affaire.png"
+    },
+    {
+      "id": "1296",
+      "group": "Personne",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "green",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "identity: 1296",
+      "aggregatedproperties": null,
+      "properties": {
+        "identity": 1296,
+        "num": 2,
+        "تاريخ الميلاد": "13-03-1945",
+        "اللقب": "سلاطنية",
+        "_Degré_entrant": 2,
+        "رقم التعريف الوطني": "18613631685904",
+        "الاسم": "مروان"
+      },
+      "image": "/icon/Personne.png"
+    },
+    {
+      "id": "1294",
+      "group": "Personne",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "green",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "identity: 1294",
+      "aggregatedproperties": null,
+      "properties": {
+        "identity": 1294,
+        "num": 1,
+        "اللقب": "موهوب",
+        "تاريخ الميلاد": "22-09-1994",
+        "_Degré_entrant": 3,
+        "رقم التعريف الوطني": "45339030376158",
+        "الاسم": "منير"
+      },
+      "image": "/icon/Personne.png"
+    },
+    {
+      "id": "712",
+      "group": "Unite",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "#8e6cb7",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "identity: 712",
+      "aggregatedproperties": null,
+      "properties": {
+        "Type": "Brigade",
+        "identity": 712,
+        "nom_arabe": "الفرقة الإقليمية للدرك الوطني بأولاد سعيد",
+        "nom_francais": "Brigade territoriale de la GN Ouled Saïd"
+      },
+      "image": "/icon/Unite.png"
+    },
+    {
+      "id": "134203",
+      "group": "Phone",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "#e7f529",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "identity: 134203",
+      "aggregatedproperties": null,
+      "properties": {
+        "degree_in": 1,
+        "num": "0542447281",
+        "sum_degree_in": 25,
+        "multi": 0,
+        "_SommeDuréesEntrantes": 1,
+        "identity": 134203,
+        "enterdureetotal": 25,
+        "entrenin": 1,
+        "operateur": "Ooredoo",
+        "total_degree_second": 25,
+        "_DegréEntrant": 1,
+        "degree_out": 1,
+        "_Degrésortant": 1
+      },
+      "image": "/icon/Phone.png"
+    },
+    {
+      "id": "136199",
+      "group": "Phone",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "#e7f529",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "identity: 136199",
+      "aggregatedproperties": null,
+      "properties": {
+        "degree_in": 1,
+        "num": "0667209514",
+        "sum_degree_in": 35,
+        "multi": 0,
+        "_SommeDuréesEntrantes": 1,
+        "identity": 136199,
+        "enterdureetotal": 35,
+        "entrenin": 1,
+        "operateur": "Mobilis",
+        "total_degree_second": 35,
+        "_DegréEntrant": 1,
+        "degree_out": 1,
+        "_Degrésortant": 1
+      },
+      "image": "/icon/Phone.png"
+    },
+    {
+      "id": "9455",
+      "group": "Virtuel",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "#222839",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "Type: Facebook\nNom: Michael Morales",
+      "aggregatedproperties": null,
+      "properties": {
+        "Type": "Facebook",
+        "identity": 9455,
+        "ID": "175575809826100",
+        "__Degré_Sortant": 1,
+        "Nom": "Michael Morales",
+        "__Degré_entrant": 0
+      },
+      "image": "/icon/virtuel.png"
+    }
+  ],
+  "edges": [
+    {
+      "id": "4092",
+      "from": "1149",
+      "to": "1296",
+      "properties": {
+        "identity": 4092
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Impliquer",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Impliquer"
+        }
+      ],
+      "group": "Impliquer"
+    },
+    {
+      "id": "4091",
+      "from": "1149",
+      "to": "1294",
+      "properties": {
+        "identity": 4091
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Impliquer",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Impliquer"
+        }
+      ],
+      "group": "Impliquer"
+    },
+    {
+      "id": "1091",
+      "from": "1149",
+      "to": "712",
+      "properties": {
+        "identity": 1091
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Traiter",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Traiter"
+        }
+      ],
+      "group": "Traiter"
+    },
+    {
+      "id": "35630",
+      "from": "134203",
+      "to": "1296",
+      "properties": {
+        "identity": 35630
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Proprietaire",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Proprietaire"
+        }
+      ],
+      "group": "Proprietaire"
+    },
+    {
+      "id": "35631",
+      "from": "136199",
+      "to": "1294",
+      "properties": {
+        "identity": 35631
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Proprietaire",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Proprietaire"
+        }
+      ],
+      "group": "Proprietaire"
+    },
+    {
+      "id": "13210",
+      "from": "9455",
+      "to": "1294",
+      "properties": {
+        "identity": 13210
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Proprietaire",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Proprietaire"
+        }
+      ],
+      "group": "Proprietaire"
+    }
+  ]
+}
