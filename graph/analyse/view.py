@@ -262,7 +262,7 @@ def get_relationship_types_for_node_type(request):
         with driver.session(database=settings.NEO4J_DATABASE) as session:
             # Query to get all relationship types connected to the node type
             query = f"""
-            MATCH (n:{node_type})-[r]-()
+            MATCH (n:{node_type})-[r]-(:{node_type})
             RETURN DISTINCT type(r) AS relationship_type
             """
             
