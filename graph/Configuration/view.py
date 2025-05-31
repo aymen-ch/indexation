@@ -7,7 +7,8 @@ from rest_framework import status
 from pathlib import Path
 
 from graph.Utility_QueryExecutors import parse_to_graph_with_transformer
-from graph.Utility_QueryExecutors import run_query
+from graph.Utility_QueryExecutors import run_query,driver
+
 
 # Base configuration directory
 CONFIG_BASE_DIR = Path(settings.BASE_DIR) / 'configuration'
@@ -255,24 +256,8 @@ def add_predefined_question(request):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        # Test the Cypher query
-        try:
-            query = request.data['query']
-            parameters = request.data['parameters']
-            graph_data = parse_to_graph_with_transformer(query, parameters)  # Assuming this function exists
-
-            if not graph_data["nodes"] and not graph_data["edges"]:
-                return Response(
-                    {"error": "Query did not return any nodes, relationships, or paths"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        except Exception as e:
-            return Response(
-                {"error": f"Invalid Cypher query: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Load existing questions
+        # Test nessiter un logique soit donner la main a l'utilisateur de voir
+      
         try:
             with open(questions_file, 'r', encoding='utf-8') as file:
                 questions = json.load(file)
@@ -443,3 +428,49 @@ def get_actions_by_node_type(request):
             {'error': f'Error retrieving actions: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+    
+@api_view(['POST'])
+def get_schema(request):
+    with driver.session(database=settings.NEO4J_DATABASE) as session:
+        try:
+            result = session.run("CALL db.schema.visualization()")
+            record = result.single()
+
+            if not record:
+                return Response({'error': 'No schema data found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Extraire les noeuds et relations
+            nodes = record["nodes"]
+            relationships = record["relationships"]
+
+            # Transformer en format JSON-sérialisable
+            formatted_nodes = [
+                {
+                    "id": node.id,
+                    "labels": list(node.labels),
+                    "properties": dict(node.items())
+                } for node in nodes
+            ]
+
+            formatted_relationships = [
+                {
+                    "id": rel.id,
+                    "type": rel.type,
+                    "startNode": rel.start_node.id,
+                    "endNode": rel.end_node.id,
+                    "properties": dict(rel.items())
+                } for rel in relationships
+            ]
+
+            return Response({
+                "nodes": formatted_nodes,
+                "relationships": formatted_relationships
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        finally:
+            driver.close()
+
+

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "TRANSACTION_groupé",
+    "path": [
+      "Account",
+      "TRANSACTION",
+      "Account"
+    ]
+  }
+]

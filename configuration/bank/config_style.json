@@ -30,17 +30,11 @@
       "icon": "/icon/default.png",
       "labelKey": "identity"
     },
-    "DAB": {
-      "color": "#7ddd1d",
-      "size": 90,
-      "icon": "/icon/Unite.png",
-      "labelKey": "identity,ccp"
-    },
     "Account": {
-      "color": "#3642dd",
+      "color": "#c27024",
       "size": 90,
-      "icon": "/icon/accountant2.png",
-      "labelKey": "identity,ccp"
+      "icon": "/icon/accountant.png",
+      "labelKey": "identity,ccp,_sum_degree_in"
     }
   }
 }

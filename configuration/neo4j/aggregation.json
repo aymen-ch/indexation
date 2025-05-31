@@ -34,5 +34,45 @@
       "Proprietaire",
       "Virtuel"
     ]
+  },
+  {
+    "name": "hhkj",
+    "path": [
+      "Commune",
+      "situer",
+      "Unite",
+      "Traiter",
+      "Affaire"
+    ]
+  },
+  {
+    "name": "hi",
+    "path": [
+      "Unite",
+      "situer",
+      "Commune",
+      "appartient",
+      "Daira",
+      "appartient",
+      "Wilaya"
+    ]
+  },
+  {
+    "name": "ji",
+    "path": [
+      "Daira",
+      "appartient",
+      "Commune",
+      "situer",
+      "Unite"
+    ]
+  },
+  {
+    "name": "Appel_telephone_groupé",
+    "path": [
+      "Phone",
+      "Appel_telephone",
+      "Phone"
+    ]
   }
 ]

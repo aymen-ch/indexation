@@ -12,18 +12,8 @@ from neo4j.exceptions import CypherSyntaxError
 import json
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-
+from graph.Utility_QueryExecutors import driver
 import requests
-
-try:
-    driver = GraphDatabase.driver(settings.NEO4J_URI, auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD,settings.NEO4J_DATABASE))
-    with driver.session() as session:
-        result = session.run("RETURN 'Connected to Neo4j'")
-        for record in result:
-            print(record)
-except Exception as e:
-    print(f"An error occurred: {e}")
-
 
 
 def call_ollama(prompt: str, model: str = "llama2") -> str:
@@ -266,7 +256,7 @@ You are a Neo4j expert tasked with converting Arabic questions into Cypher queri
 def execute_query_for_response_generation(query):
     def execute_query(query):
         def _execute():
-            with driver.session(database="neo4j") as session:
+            with driver.session(database=settings.NEO4J_DATABASE) as session:
                 result = session.run(query)
                 records_list = []
                 for record in result:
@@ -282,11 +272,10 @@ def execute_query_for_response_generation(query):
         with ThreadPoolExecutor() as executor:
             future = executor.submit(_execute)
             try:
-                return future.result(timeout=7)
+                return future.result(timeout=200)
             except TimeoutError:
                 return None, False  # Return None and indicate failure
-            except Exception as e:
-                return None, False  # Return None and indicate failure
+  
 
     try:
         # Try executing the original query
@@ -302,6 +291,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 def execute_and_correct_query(query, enable_correction=True):
+    
     def execute_query(query):
             with driver.session(database="neo4j") as session:
                 result = session.run(query)

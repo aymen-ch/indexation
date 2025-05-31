@@ -242,7 +242,7 @@ def execute_action(request):
 
 
 @api_view(['POST'])
-def get_node_relationships(request):
+def extensibility(request):
     """
     Retrieves a list of relationships for a given node type, ID, and relation type.
 
@@ -299,7 +299,7 @@ def get_node_relationships(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
-def get_virtual_relationships(request):
+def extensibilty_virtuel(request):
 
     """
     Retrieves a list of virtual relationships for a given node type, ID, and path.
@@ -420,7 +420,6 @@ def get_virtual_relationships(request):
             # Create a virtual relationship (e.g., impliquer_dans)
             if end_id:
                 edges[edge_id_counter] = {
-                   
                     "type": virtual_relation,
                     "startNode": start_id,
                     "endNode": end_id,
