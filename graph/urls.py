@@ -23,6 +23,8 @@ urlpatterns = [
     path('get_relationship_numeric_properties/', analyse_view.get_relationship_numeric_properties, name='get_relationship_numeric_properties'),
     path('calculate_centrality/', analyse_view.calculate_centrality, name='calculate_centrality'),
     path('link_prediction/', analyse_view.link_prediction, name='link_prediction'),
+    path('detect_communities/', analyse_view.detect_communities, name='detect_communities'),
+    
     
     ############################### aggregation ###################################  
     path('agregate/', view_aggregation.aggregate, name='agregate_context'),

@@ -684,3 +684,125 @@ def link_prediction(request):
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+@api_view(['POST'])
+def detect_communities(request):
+    """
+    Detect communities in a graph using a specified community detection algorithm.
+
+    Parameters:
+        node_type (str): Node type for the graph projection.
+        community_algorithm (str): Algorithm to use (e.g., 'Louvain', 'Label Propagation', 'K1 Coloring').
+        selected_relationships (list): List of relationship types to include.
+        write_property (str): Property name to store community IDs.
+        is_directed (bool): Whether the graph is directed (default: True).
+        virtual_relationships (list, optional): List of virtual relationships (if any).
+
+    Returns:
+        dict: Community detection results, including statistics and top communities.
+    """
+    data = request.data
+    node_type = data.get('nodeType')
+    community_algorithm = data.get('communityAlgorithm')
+    write_property = data.get('writeProperty')
+    selected_relationships = data.get('selectedRelationships', [])
+    is_directed = data.get('isDirected', True)
+    virtual_relationships = data.get('virtualRelationships', [])
+
+    # Validate required parameters
+    if not all([node_type, community_algorithm, write_property, selected_relationships]):
+        return Response(
+            {"error": "nodeType, communityAlgorithm, writeProperty, and selectedRelationships are required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        with driver.session(database=settings.NEO4J_DATABASE) as session:
+            # Check if communityGraph exists and drop it if it does
+            exists_query = """
+                CALL gds.graph.exists('communityGraph')
+                YIELD exists
+                RETURN exists
+            """
+            result = session.run(exists_query).single()
+            if result and result['exists']:
+                session.run("CALL gds.graph.drop('communityGraph', false)")
+
+            # Create graph projection
+            relationship_query = '|'.join(selected_relationships)
+            graph_query = f"""
+                MATCH (source:{node_type})-[r:{relationship_query}]->(target:{node_type})
+                RETURN gds.graph.project(
+                    'communityGraph',
+                    source,
+                    target,
+                    {{}},
+                    {{ 
+                        graph: '{ 'DIRECTED' if is_directed else 'UNDIRECTED' }' 
+                    }}
+                )
+            """
+            session.run(graph_query)
+
+            # Map community detection algorithms to their procedures
+            algorithm_map = {
+                'Louvain': {'procedure': 'gds.louvain'},
+                'Label Propagation': {'procedure': 'gds.labelPropagation'},
+                'K1 Coloring': {'procedure': 'gds.k1coloring'},
+                'Modularity Optimization': {'procedure': 'gds.modularityOptimization'},
+                'Weakly Connected Components': {'procedure': 'gds.wcc'},
+            }
+
+            if community_algorithm not in algorithm_map:
+                return Response(
+                    {"error": f"Unsupported community algorithm: {community_algorithm}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+           
+            algo_config = algorithm_map[community_algorithm]
+
+            # Run community detection
+            community_query = f"""
+                CALL {algo_config['procedure']}.write('communityGraph', {{
+                    writeProperty: '{write_property}'
+                }})
+            """
+            print(community_query)
+            community_result = session.run(community_query).single()
+
+            # Get top communities (top 5 communities by node count)
+            top_communities_query = f"""
+                MATCH (n)
+                WHERE n.{write_property} IS NOT NULL
+                WITH n.{write_property} AS communityId, count(n) AS nodeCount
+                RETURN communityId, nodeCount
+                ORDER BY nodeCount DESC
+                LIMIT 5
+            """
+            top_communities = [
+                {'communityId': record['communityId'], 'nodeCount': record['nodeCount']}
+                for record in session.run(top_communities_query)
+            ]
+
+            # Drop the graph projection
+            session.run("CALL gds.graph.drop('communityGraph', false)")
+
+            # Prepare response
+            response_data = {
+                'node_type': node_type,
+                'community_algorithm': community_algorithm,
+                'write_property': write_property,
+                # 'community_count': community_result['communityCount'] if community_result['communityCount'] else 0,
+                # 'modularity': community_result['modularity'] if community_result['modularity'] else 0,
+                # 'iterations': community_result['ranIterations'] if community_result['ranIterations'] else 0,
+                # 'top_communities': top_communities
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
