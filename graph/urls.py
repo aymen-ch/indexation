@@ -92,6 +92,8 @@ urlpatterns = [
     path('add_aggregation/', config_view.add_aggregation, name='add_aggregation'),
     path('get_aggregations/', config_view.get_aggregations, name='get_aggregations'),
     path('get_schema/', config_view.get_schema, name='get_schema'),
+    path('visualizations/save/', config_view.save_visualization, name='save_visualization'),
+    path('visualizations/', config_view.get_visualizations, name='get_visualizations'),
 ]
 
 

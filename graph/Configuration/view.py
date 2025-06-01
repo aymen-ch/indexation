@@ -1,5 +1,7 @@
 import os
 import json
+import re
+import uuid
 from django.conf import settings
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -70,6 +72,117 @@ def ensure_db_config_files(database_name):
         if not file_path.exists():
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(default_content, f, indent=2, ensure_ascii=False)
+    # Crée le répertoire pour les visualisations
+    visualisations_dir = db_config_path / 'visualisations'
+    visualisations_dir.mkdir(exist_ok=True)
+
+
+def sanitize_filename(name):
+    """Nettoie le nom pour en faire un nom de fichier valide"""
+    # Remplace les caractères non alphanumériques par des underscores
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+    # Limite la longueur pour éviter les problèmes
+    return sanitized[:100]
+
+@api_view(['POST'])
+def save_visualization(request):
+    """Enregistre une nouvelle visualisation dans le répertoire des visualisations"""
+    try:
+        database_name = settings.NEO4J_DATABASE
+        ensure_db_config_files(database_name)
+        visualisations_dir = get_db_config_path(database_name) / 'visualisations'
+
+        # Valide les champs requis
+        required_fields = ['name', 'nodes', 'edges']
+        for field in required_fields:
+            if field not in request.data:
+                return Response(
+                    {"error": f"Champ requis manquant : {field}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Récupère les données de la visualisation
+        visualization_data = {
+            "name": request.data['name'],
+            "nodes": request.data['nodes'],
+            "edges": request.data['edges']
+        }
+
+        # Valide que nodes et edges sont des listes
+        if not isinstance(visualization_data['nodes'], list) or not isinstance(visualization_data['edges'], list):
+            return Response(
+                {"error": "Les champs 'nodes' et 'edges' doivent être des listes"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Génère un ID unique pour la visualisation
+        visualization_id = str(uuid.uuid4())
+        # Crée un nom de fichier sécurisé
+        file_name = f"{sanitize_filename(visualization_data['name'])}_{visualization_id}.json"
+        file_path = visualisations_dir / file_name
+
+        # Sauvegarde la visualisation
+        with open(file_path, 'w', encoding='utf-8') as file:
+            json.dump(visualization_data, file, indent=2, ensure_ascii=False)
+
+        return Response(
+            {
+                "message": f"Visualisation '{visualization_data['name']}' enregistrée avec succès",
+                "id": visualization_id,
+                "name": visualization_data['name'],
+                "file": str(file_path)
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": f"Erreur lors de l'enregistrement de la visualisation : {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+def get_visualizations(request):
+    """Récupère la liste des visualisations ou une visualisation spécifique par ID"""
+    try:
+        database_name = settings.NEO4J_DATABASE
+        ensure_db_config_files(database_name)
+        visualisations_dir = get_db_config_path(database_name) / 'visualisations'
+
+        visualization_id = request.query_params.get('id')
+        visualizations = []
+
+        if visualization_id:
+            # Recherche une visualisation spécifique par ID
+            for file_path in visualisations_dir.glob('*.json'):
+                if visualization_id in file_path.stem:
+                    with open(file_path, 'r', encoding='utf-8') as file:
+                        visualization_data = json.load(file)
+                        return Response(visualization_data, status=status.HTTP_200_OK)
+            return Response(
+                {"error": f"Visualisation avec l'ID '{visualization_id}' non trouvée"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        else:
+            # Liste toutes les visualisations
+            for file_path in visualisations_dir.glob('*.json'):
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    data = json.load(file)
+                    # Extrait l'ID du nom du fichier (après le dernier underscore)
+                    file_id = file_path.stem.split('_')[-1]
+                    visualizations.append({
+                        "id": file_id,
+                        "name": data.get('name', file_path.stem),
+                        "file": str(file_path)
+                    })
+            return Response(visualizations, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": f"Erreur lors de la récupération des visualisations : {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 @api_view(['POST'])
 def add_action(request):
