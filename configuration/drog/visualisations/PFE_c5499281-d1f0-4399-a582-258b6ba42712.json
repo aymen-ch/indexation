@@ -1,0 +1,201 @@
+{
+  "name": "PFE",
+  "nodes": [
+    {
+      "id": "1166",
+      "group": "Affaire",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "#D20103",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "Number: Drog_18",
+      "aggregatedproperties": null,
+      "properties": {
+        "date": "01-02-2023",
+        "Type": "مخدرات",
+        "Number": "Drog_18",
+        "neo4jImportId": "1166",
+        "identity": 1166
+      },
+      "image": "/icon/affaire.png"
+    },
+    {
+      "id": "718",
+      "group": "Unite",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "#8e6cb7",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "identity: 718",
+      "aggregatedproperties": null,
+      "properties": {
+        "Type": "Brigade",
+        "neo4jImportId": "718",
+        "identity": 718,
+        "nom_arabe": "الفرقة الإقليمية للدرك الوطني بان زغمير",
+        "nom_francais": "Brigade territoriale de la GN In Zghmir"
+      },
+      "image": "/icon/Unite.png"
+    },
+    {
+      "id": "1402",
+      "group": "Personne",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "green",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "identity: 1402",
+      "aggregatedproperties": null,
+      "properties": {
+        "_Lvl_of_Implications": [
+          1,
+          0,
+          57,
+          0
+        ],
+        "_affiresoutin": [],
+        "neo4jImportId": "1402",
+        "_affireleader": [],
+        "identity": 1402,
+        "num": 55,
+        "اللقب": "بوشرقي",
+        "تاريخ الميلاد": "07-02-1976",
+        "_class": [
+          "neutre",
+          "operationeel"
+        ],
+        "رقم التعريف الوطني": "19494447023963",
+        "_affireOpretioneele": [
+          1166
+        ],
+        "الاسم": "رقية"
+      },
+      "image": "/icon/Personne.png",
+      "_class": [
+        "neutre",
+        "operationeel"
+      ]
+    },
+    {
+      "id": "1404",
+      "group": "Personne",
+      "shape": "circularImage",
+      "size": 90,
+      "color": "green",
+      "html": {},
+      "ischema": false,
+      "selecte": false,
+      "captionnode": "identity: 1404",
+      "aggregatedproperties": null,
+      "properties": {
+        "_Lvl_of_Implications": [
+          1,
+          0,
+          48,
+          0
+        ],
+        "_affiresoutin": [],
+        "neo4jImportId": "1404",
+        "_affireleader": [],
+        "identity": 1404,
+        "num": 56,
+        "اللقب": "براهيمي",
+        "تاريخ الميلاد": "04-06-1977",
+        "_class": [
+          "neutre",
+          "operationeel"
+        ],
+        "رقم التعريف الوطني": "97483650483171",
+        "_affireOpretioneele": [
+          1166
+        ],
+        "الاسم": "رشيد"
+      },
+      "image": "/icon/Personne.png",
+      "_class": [
+        "neutre",
+        "operationeel"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "1152923703630103694",
+      "from": "1166",
+      "to": "718",
+      "properties": {
+        "identity": 1108
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Traiter",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Traiter"
+        }
+      ],
+      "group": "Traiter"
+    },
+    {
+      "id": "1152924803141731470",
+      "from": "1166",
+      "to": "1402",
+      "properties": {
+        "identity": 4145
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Impliquer",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Impliquer"
+        }
+      ],
+      "group": "Impliquer"
+    },
+    {
+      "id": "1155176602955416718",
+      "from": "1166",
+      "to": "1404",
+      "properties": {
+        "identity": 4146
+      },
+      "color": "red",
+      "width": 7,
+      "captionSize": 5,
+      "captionAlign": "center",
+      "aggregationPath": null,
+      "captions": [
+        {
+          "value": "Impliquer",
+          "styles": [
+            "bold",
+            "italic"
+          ],
+          "key": "Impliquer"
+        }
+      ],
+      "group": "Impliquer"
+    }
+  ]
+}
